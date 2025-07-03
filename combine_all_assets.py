@@ -28,6 +28,9 @@ class AssetCombiner:
         
         if self.supabase_url and self.supabase_key:
             self.supabase = create_client(self.supabase_url, self.supabase_key)
+            logger.info("✅ Supabase connection configured")
+        else:
+            logger.warning("⚠️ Supabase environment variables not set")
             
         # Emergency currency conversion rates (backup if Go conversion fails)
         self.emergency_rates = {
@@ -58,6 +61,7 @@ class AssetCombiner:
             'CAD': 0.74,      # Canadian Dollar
             'EUR': 1.08,      # Euro
             'GBP': 1.26,      # British Pound
+            'ARS': 0.0010,    # Argentine Peso (~1000 ARS = 1 USD)
         }
         
     def detect_currency_from_symbol(self, symbol: str, country: str = '') -> str:
@@ -74,6 +78,12 @@ class AssetCombiner:
             return 'SAR'
         elif symbol_upper.endswith('.TA') or country_upper == 'IL':
             return 'ILS'
+        elif symbol_upper.endswith('.BA') or country_upper == 'AR':
+            return 'ARS'
+        elif symbol_upper.endswith('.L') or country_upper == 'GB':
+            return 'GBP'
+        elif symbol_upper.endswith('.JO') or country_upper == 'ZA':
+            return 'ZAR'
         elif symbol_upper.endswith('.CO') or country_upper == 'CO':
             return 'COP'
         elif symbol_upper.endswith('.LM') or country_upper == 'PE':
@@ -92,8 +102,6 @@ class AssetCombiner:
             return 'BRL'
         elif symbol_upper.endswith('.MX') or country_upper == 'MX':
             return 'MXN'
-        elif symbol_upper.endswith('.JO') or country_upper == 'ZA':
-            return 'ZAR'
         elif symbol_upper.endswith('.BK') or country_upper == 'TH':
             return 'THB'
         elif symbol_upper.endswith('.KL') or country_upper == 'MY':
@@ -118,8 +126,6 @@ class AssetCombiner:
             return 'CAD'
         elif symbol_upper.endswith('.PA') or symbol_upper.endswith('.DE') or country_upper in ['FR', 'DE', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'GR', 'FI', 'IE']:
             return 'EUR'
-        elif symbol_upper.endswith('.L') or country_upper == 'GB':
-            return 'GBP'
         else:
             return 'USD'
     
@@ -177,8 +183,8 @@ class AssetCombiner:
     def combine_all_assets(self) -> List[Dict]:
         """Combine all asset data from different sources"""
         
-        # Load all data sources
-        stock_data = self.load_json_file('stock_data.json')
+        # Load all data sources (matching Go program output filenames)
+        stock_data = self.load_json_file('global_assets_fmp.json')
         crypto_data = self.load_json_file('crypto_data.json')
         
         logger.info(f"📊 Loaded: {len(stock_data)} stocks, {len(crypto_data)} crypto")
