@@ -327,7 +327,7 @@ def combine_and_rank_assets() -> List[Dict[str, Any]]:
         all_assets.extend(traditional_standardized)
     
     if crypto_assets:
-        crypto_standardized = standardize_asset_data(crypto_assets, "ccxt/coingecko")
+        crypto_standardized = standardize_asset_data(crypto_assets, "coingecko")
         all_assets.extend(crypto_standardized)
     
     print(f"\n🔗 Combined total: {len(all_assets)} assets from all sources")

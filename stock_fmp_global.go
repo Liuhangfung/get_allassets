@@ -189,7 +189,7 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 
 	var assets []AssetData
 	stockCount := 0
-	maxStocks := 200 // Limit to avoid rate limits
+	maxStocks := 490 // Increased to get ~500 total assets (490 stocks + 10 crypto)
 	
 	for _, stock := range screenerData {
 		if stockCount >= maxStocks {
