@@ -170,7 +170,42 @@ func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error)
 	return &profiles[0], nil
 }
 
+// Helper function to check if a string contains a word with proper word boundaries
+func containsWord(text, word string) bool {
+	// Convert to upper case for case-insensitive comparison
+	textUpper := strings.ToUpper(text)
+	wordUpper := strings.ToUpper(word)
+	
+	// Find all occurrences of the word
+	index := 0
+	for {
+		pos := strings.Index(textUpper[index:], wordUpper)
+		if pos == -1 {
+			break
+		}
+		
+		// Adjust position to absolute index
+		pos += index
+		
+		// Check if it's a complete word (not part of another word)
+		isWordStart := pos == 0 || !isAlphaNumeric(textUpper[pos-1])
+		isWordEnd := pos+len(wordUpper) == len(textUpper) || !isAlphaNumeric(textUpper[pos+len(wordUpper)])
+		
+		if isWordStart && isWordEnd {
+			return true
+		}
+		
+		// Move to next potential match
+		index = pos + 1
+	}
+	
+	return false
+}
 
+// Helper function to check if a character is alphanumeric
+func isAlphaNumeric(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
 
 // Helper function to determine which listing to keep for duplicate companies
 func shouldKeepNewListing(newStock, existingStock FMPStockScreener) bool {
@@ -344,15 +379,15 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 			continue
 		}
 		
-		// Skip index funds, ETFs in company name
+		// Skip index funds, ETFs in company name (using word boundaries)
 		nameUpper := strings.ToUpper(stock.CompanyName)
-		if strings.Contains(nameUpper, "ETF") ||
-		   strings.Contains(nameUpper, "INDEX") ||
-		   strings.Contains(nameUpper, "FUND") ||
-		   strings.Contains(nameUpper, "SPDR") ||
-		   strings.Contains(nameUpper, "ISHARES") ||
-		   strings.Contains(nameUpper, "VANGUARD") ||
-		   strings.Contains(nameUpper, "INVESCO") {
+		if containsWord(nameUpper, "ETF") ||
+		   containsWord(nameUpper, "INDEX") ||
+		   containsWord(nameUpper, "FUND") ||
+		   containsWord(nameUpper, "SPDR") ||
+		   containsWord(nameUpper, "ISHARES") ||
+		   containsWord(nameUpper, "VANGUARD") ||
+		   containsWord(nameUpper, "INVESCO") {
 			continue
 		}
 
