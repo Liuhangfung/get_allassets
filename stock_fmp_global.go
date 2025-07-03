@@ -294,6 +294,16 @@ func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
 		"MYR": 0.22,      // 1 MYR = ~0.22 USD (about 4.5 MYR = 1 USD)
 		"PHP": 0.018,     // 1 PHP = ~0.018 USD (about 56 PHP = 1 USD)
 		"VND": 0.000040,  // 1 VND = ~0.000040 USD (about 25,000 VND = 1 USD)
+		"SGD": 0.74,      // 1 SGD = ~0.74 USD
+		"TWD": 0.031,     // 1 TWD = ~0.031 USD (about 32 TWD = 1 USD)
+		"CLP": 0.0010,    // 1 CLP = ~0.0010 USD (about 1,000 CLP = 1 USD)
+		"SAR": 0.267,     // 1 SAR = ~0.267 USD (about 3.75 SAR = 1 USD)
+		"ILS": 0.27,      // 1 ILS = ~0.27 USD (about 3.7 ILS = 1 USD)
+		"COP": 0.00025,   // 1 COP = ~0.00025 USD (about 4,000 COP = 1 USD)
+		"PEN": 0.27,      // 1 PEN = ~0.27 USD (about 3.7 PEN = 1 USD)
+		"EGP": 0.020,     // 1 EGP = ~0.020 USD (about 50 EGP = 1 USD)
+		"TRY": 0.029,     // 1 TRY = ~0.029 USD (about 34 TRY = 1 USD)
+		"RUB": 0.010,     // 1 RUB = ~0.010 USD (about 100 RUB = 1 USD)
 	}
 	
 	if rate, exists := fallbackRates[fromCurrency]; exists {
@@ -512,46 +522,66 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 		
 		// Determine currency and convert to USD
 		var currencyCode string
-		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".HK") || 
-		   strings.ToUpper(stock.ExchangeShortName) == "HKSE" ||
-		   strings.ToUpper(stock.Country) == "HK" {
+		symbolUpper := strings.ToUpper(stock.Symbol)
+		countryUpper := strings.ToUpper(stock.Country)
+		exchangeUpper := strings.ToUpper(stock.ExchangeShortName)
+		
+		// Currency detection by symbol suffix (most reliable)
+		if strings.HasSuffix(symbolUpper, ".HK") || exchangeUpper == "HKSE" || countryUpper == "HK" {
 			currencyCode = "HKD"
-		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".L") ||
-		          strings.ToUpper(stock.ExchangeShortName) == "LSE" {
+		} else if strings.HasSuffix(symbolUpper, ".L") || exchangeUpper == "LSE" {
 			currencyCode = "GBP"
-		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".PA") ||
-		          strings.HasSuffix(strings.ToUpper(stock.Symbol), ".DE") ||
-		          strings.Contains(strings.ToUpper(stock.ExchangeShortName), "EUR") {
+		} else if strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") || 
+		          strings.Contains(exchangeUpper, "EUR") {
 			currencyCode = "EUR"
-		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".T") ||
-		          strings.ToUpper(stock.Country) == "JP" {
+		} else if strings.HasSuffix(symbolUpper, ".T") || countryUpper == "JP" {
 			currencyCode = "JPY"
-		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".TO") ||
-		          strings.ToUpper(stock.Country) == "CA" {
+		} else if strings.HasSuffix(symbolUpper, ".TO") || countryUpper == "CA" {
 			currencyCode = "CAD"
-		} else if strings.ToUpper(stock.Country) == "CN" {
+		} else if strings.HasSuffix(symbolUpper, ".SS") || strings.HasSuffix(symbolUpper, ".SZ") || countryUpper == "CN" {
 			currencyCode = "CNY"
-		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") ||
-		          strings.ToUpper(stock.Country) == "ID" {
+		} else if strings.HasSuffix(symbolUpper, ".JK") || countryUpper == "ID" {
 			currencyCode = "IDR"
-		} else if strings.ToUpper(stock.Country) == "IN" {
+		} else if strings.HasSuffix(symbolUpper, ".BO") || strings.HasSuffix(symbolUpper, ".NS") || countryUpper == "IN" {
 			currencyCode = "INR"
-		} else if strings.ToUpper(stock.Country) == "KR" {
+		} else if strings.HasSuffix(symbolUpper, ".KS") || strings.HasSuffix(symbolUpper, ".KQ") || countryUpper == "KR" {
 			currencyCode = "KRW"
-		} else if strings.ToUpper(stock.Country) == "BR" {
+		} else if strings.HasSuffix(symbolUpper, ".SA") || countryUpper == "BR" {
 			currencyCode = "BRL"
-		} else if strings.ToUpper(stock.Country) == "MX" {
+		} else if strings.HasSuffix(symbolUpper, ".MX") || countryUpper == "MX" {
 			currencyCode = "MXN"
-		} else if strings.ToUpper(stock.Country) == "ZA" {
+		} else if strings.HasSuffix(symbolUpper, ".JO") || countryUpper == "ZA" {
 			currencyCode = "ZAR"
-		} else if strings.ToUpper(stock.Country) == "TH" {
+		} else if strings.HasSuffix(symbolUpper, ".BK") || countryUpper == "TH" {
 			currencyCode = "THB"
-		} else if strings.ToUpper(stock.Country) == "MY" {
+		} else if strings.HasSuffix(symbolUpper, ".KL") || countryUpper == "MY" {
 			currencyCode = "MYR"
-		} else if strings.ToUpper(stock.Country) == "PH" {
+		} else if strings.HasSuffix(symbolUpper, ".PS") || countryUpper == "PH" {
 			currencyCode = "PHP"
-		} else if strings.ToUpper(stock.Country) == "VN" {
+		} else if strings.HasSuffix(symbolUpper, ".VN") || countryUpper == "VN" {
 			currencyCode = "VND"
+		} else if strings.HasSuffix(symbolUpper, ".AX") || countryUpper == "AU" {
+			currencyCode = "AUD"
+		} else if strings.HasSuffix(symbolUpper, ".SI") || countryUpper == "SG" {
+			currencyCode = "SGD"
+		} else if strings.HasSuffix(symbolUpper, ".TW") || countryUpper == "TW" {
+			currencyCode = "TWD"
+		} else if strings.HasSuffix(symbolUpper, ".SN") || countryUpper == "CL" {
+			currencyCode = "CLP"  // Chilean Peso
+		} else if strings.HasSuffix(symbolUpper, ".SR") || countryUpper == "SA" {
+			currencyCode = "SAR"  // Saudi Riyal
+		} else if strings.HasSuffix(symbolUpper, ".TA") || countryUpper == "IL" {
+			currencyCode = "ILS"  // Israeli Shekel
+		} else if strings.HasSuffix(symbolUpper, ".CO") || countryUpper == "CO" {
+			currencyCode = "COP"  // Colombian Peso
+		} else if strings.HasSuffix(symbolUpper, ".LM") || countryUpper == "PE" {
+			currencyCode = "PEN"  // Peruvian Sol
+		} else if strings.HasSuffix(symbolUpper, ".EG") || countryUpper == "EG" {
+			currencyCode = "EGP"  // Egyptian Pound
+		} else if strings.HasSuffix(symbolUpper, ".IS") || countryUpper == "TR" {
+			currencyCode = "TRY"  // Turkish Lira
+		} else if strings.HasSuffix(symbolUpper, ".ME") || countryUpper == "RU" {
+			currencyCode = "RUB"  // Russian Ruble
 		} else {
 			currencyCode = "USD" // Default to USD
 		}

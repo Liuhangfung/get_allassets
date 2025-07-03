@@ -1,409 +1,370 @@
 #!/usr/bin/env python3
-"""
-Global Asset Combiner and Ranker
-Combines stocks, crypto, and commodities into a single ranked list
-"""
 
 import json
-import os
-import sys
 import logging
+import os
+import requests
+import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-import subprocess
-
-# Auto-install required packages
-def install_and_import(package_name: str, import_name: str = None):
-    """Install and import a package if not available"""
-    if import_name is None:
-        import_name = package_name
-    
-    try:
-        __import__(import_name)
-    except ImportError:
-        print(f"📦 Installing {package_name}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        __import__(import_name)
-
-# Install required packages
-install_and_import("python-dotenv", "dotenv")
-install_and_import("supabase")
-install_and_import("requests")
-
-from dotenv import load_dotenv
+from typing import Dict, List, Optional
 from supabase import create_client, Client
 
-# Load environment variables
-load_dotenv()
-
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('combine_all_assets.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
-class GlobalAssetCombiner:
+class AssetCombiner:
     def __init__(self):
-        self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_ANON_KEY')
-        self.supabase_client = None
+        self.supabase_url = os.environ.get('SUPABASE_URL', '')
+        self.supabase_key = os.environ.get('SUPABASE_KEY', '')
+        self.supabase: Optional[Client] = None
         
         if self.supabase_url and self.supabase_key:
-            try:
-                self.supabase_client = create_client(self.supabase_url, self.supabase_key)
-                logger.info("✅ Supabase client initialized")
-            except Exception as e:
-                logger.warning(f"⚠️ Supabase initialization failed: {e}")
+            self.supabase = create_client(self.supabase_url, self.supabase_key)
+            
+        # Emergency currency conversion rates (backup if Go conversion fails)
+        self.emergency_rates = {
+            'IDR': 0.000065,  # Indonesian Rupiah
+            'CLP': 0.0010,    # Chilean Peso
+            'SAR': 0.267,     # Saudi Riyal
+            'ILS': 0.27,      # Israeli Shekel
+            'COP': 0.00025,   # Colombian Peso
+            'PEN': 0.27,      # Peruvian Sol
+            'EGP': 0.020,     # Egyptian Pound
+            'TRY': 0.029,     # Turkish Lira
+            'RUB': 0.010,     # Russian Ruble
+            'KRW': 0.00075,   # South Korean Won
+            'INR': 0.012,     # Indian Rupee
+            'BRL': 0.18,      # Brazilian Real
+            'MXN': 0.058,     # Mexican Peso
+            'ZAR': 0.055,     # South African Rand
+            'THB': 0.029,     # Thai Baht
+            'MYR': 0.22,      # Malaysian Ringgit
+            'PHP': 0.018,     # Philippine Peso
+            'VND': 0.000040,  # Vietnamese Dong
+            'TWD': 0.031,     # Taiwan Dollar
+            'HKD': 0.128,     # Hong Kong Dollar
+            'SGD': 0.74,      # Singapore Dollar
+            'JPY': 0.0067,    # Japanese Yen
+            'CNY': 0.14,      # Chinese Yuan
+            'AUD': 0.64,      # Australian Dollar
+            'CAD': 0.74,      # Canadian Dollar
+            'EUR': 1.08,      # Euro
+            'GBP': 1.26,      # British Pound
+        }
+        
+    def detect_currency_from_symbol(self, symbol: str, country: str = '') -> str:
+        """Detect currency from stock symbol or country"""
+        symbol_upper = symbol.upper()
+        country_upper = country.upper()
+        
+        # Symbol-based detection (most reliable)
+        if symbol_upper.endswith('.JK') or country_upper == 'ID':
+            return 'IDR'
+        elif symbol_upper.endswith('.SN') or country_upper == 'CL':
+            return 'CLP'
+        elif symbol_upper.endswith('.SR') or country_upper == 'SA':
+            return 'SAR'
+        elif symbol_upper.endswith('.TA') or country_upper == 'IL':
+            return 'ILS'
+        elif symbol_upper.endswith('.CO') or country_upper == 'CO':
+            return 'COP'
+        elif symbol_upper.endswith('.LM') or country_upper == 'PE':
+            return 'PEN'
+        elif symbol_upper.endswith('.EG') or country_upper == 'EG':
+            return 'EGP'
+        elif symbol_upper.endswith('.IS') or country_upper == 'TR':
+            return 'TRY'
+        elif symbol_upper.endswith('.ME') or country_upper == 'RU':
+            return 'RUB'
+        elif symbol_upper.endswith('.KS') or symbol_upper.endswith('.KQ') or country_upper == 'KR':
+            return 'KRW'
+        elif symbol_upper.endswith('.BO') or symbol_upper.endswith('.NS') or country_upper == 'IN':
+            return 'INR'
+        elif symbol_upper.endswith('.SA') or country_upper == 'BR':
+            return 'BRL'
+        elif symbol_upper.endswith('.MX') or country_upper == 'MX':
+            return 'MXN'
+        elif symbol_upper.endswith('.JO') or country_upper == 'ZA':
+            return 'ZAR'
+        elif symbol_upper.endswith('.BK') or country_upper == 'TH':
+            return 'THB'
+        elif symbol_upper.endswith('.KL') or country_upper == 'MY':
+            return 'MYR'
+        elif symbol_upper.endswith('.PS') or country_upper == 'PH':
+            return 'PHP'
+        elif symbol_upper.endswith('.VN') or country_upper == 'VN':
+            return 'VND'
+        elif symbol_upper.endswith('.TW') or country_upper == 'TW':
+            return 'TWD'
+        elif symbol_upper.endswith('.HK') or country_upper == 'HK':
+            return 'HKD'
+        elif symbol_upper.endswith('.SI') or country_upper == 'SG':
+            return 'SGD'
+        elif symbol_upper.endswith('.T') or country_upper == 'JP':
+            return 'JPY'
+        elif symbol_upper.endswith('.SS') or symbol_upper.endswith('.SZ') or country_upper == 'CN':
+            return 'CNY'
+        elif symbol_upper.endswith('.AX') or country_upper == 'AU':
+            return 'AUD'
+        elif symbol_upper.endswith('.TO') or country_upper == 'CA':
+            return 'CAD'
+        elif symbol_upper.endswith('.PA') or symbol_upper.endswith('.DE') or country_upper in ['FR', 'DE', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'GR', 'FI', 'IE']:
+            return 'EUR'
+        elif symbol_upper.endswith('.L') or country_upper == 'GB':
+            return 'GBP'
+        else:
+            return 'USD'
+    
+    def validate_and_fix_market_cap(self, asset: Dict) -> Dict:
+        """Validate and fix market cap values with emergency currency conversion"""
+        
+        symbol = asset.get('ticker', '')
+        country = asset.get('country', '')
+        market_cap = asset.get('market_cap', 0)
+        
+        # Skip crypto and commodities (they should be in USD already)
+        if asset.get('asset_type') in ['crypto', 'commodity']:
+            return asset
+        
+        # Emergency currency conversion for stocks with suspicious market caps
+        if market_cap > 1e12:  # > $1 trillion
+            detected_currency = self.detect_currency_from_symbol(symbol, country)
+            
+            if detected_currency != 'USD' and detected_currency in self.emergency_rates:
+                original_market_cap = market_cap
+                market_cap = market_cap * self.emergency_rates[detected_currency]
+                
+                logger.warning(f"🚨 Emergency currency conversion: {symbol} | {original_market_cap/1e12:.1f}T {detected_currency} → ${market_cap/1e9:.1f}B USD")
+                
+                # Update all USD values
+                asset['market_cap'] = market_cap
+                asset['current_price'] = asset.get('current_price', 0) * self.emergency_rates[detected_currency]
+                asset['previous_close'] = asset.get('previous_close', 0) * self.emergency_rates[detected_currency]
+        
+        # Cap market cap at $4 trillion (even Apple is ~$3.5T)
+        if market_cap > 4e12:
+            logger.warning(f"⚠️ Capping {symbol} market cap from ${market_cap/1e12:.1f}T to $4.0T")
+            asset['market_cap'] = 4e12
+        
+        # Skip stocks with unrealistic market caps
+        if market_cap > 10e12:
+            logger.error(f"❌ Removing {symbol}: Market cap too large (${market_cap/1e12:.1f}T)")
+            return None
+        
+        return asset
     
     def load_json_file(self, filename: str) -> List[Dict]:
-        """Load JSON file with error handling"""
+        """Load and validate JSON file"""
         try:
-            if os.path.exists(filename):
-                with open(filename, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    logger.info(f"📄 Loaded {len(data)} items from {filename}")
-                    return data
-            else:
-                logger.warning(f"⚠️ File not found: {filename}")
-                return []
-        except Exception as e:
-            logger.error(f"❌ Error loading {filename}: {e}")
+            with open(filename, 'r') as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except FileNotFoundError:
+            logger.warning(f"📄 File not found: {filename}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON decode error in {filename}: {e}")
             return []
     
-    def standardize_asset_data(self, asset: Dict, data_source: str) -> Dict:
-        """Standardize asset data format for database insertion"""
+    def combine_all_assets(self) -> List[Dict]:
+        """Combine all asset data from different sources"""
         
-        # Handle different data formats
-        if data_source == "stock":
-            return {
-                'rank': 0,  # Will be assigned after sorting
-                'symbol': asset.get('ticker', ''),
-                'ticker': asset.get('ticker', ''),
-                'name': asset.get('name', ''),
-                'market_cap': float(asset.get('market_cap', 0)),
-                'market_cap_raw': float(asset.get('market_cap', 0)),
-                'current_price': float(asset.get('current_price', 0)),
-                'price_raw': float(asset.get('current_price', 0)),
-                'previous_close': float(asset.get('previous_close', 0)),
-                'percentage_change': float(asset.get('percentage_change', 0)),
-                'volume': float(asset.get('volume', 0)),
-                'primary_exchange': asset.get('primary_exchange', ''),
-                'country': asset.get('country', ''),
-                'sector': asset.get('sector', ''),
-                'industry': asset.get('industry', ''),
-                'circulating_supply': None,  # Not applicable for stocks
-                'category': asset.get('asset_type', 'stock'),
-                'asset_type': asset.get('asset_type', 'stock'),
-                'data_source': data_source,
-                'image': asset.get('image', ''),
-                'snapshot_date': datetime.now().isoformat()
-            }
+        # Load all data sources
+        stock_data = self.load_json_file('stock_data.json')
+        crypto_data = self.load_json_file('crypto_data.json')
         
-        elif data_source == "crypto":
-            return {
-                'rank': 0,  # Will be assigned after sorting
-                'symbol': asset.get('symbol', ''),
-                'ticker': asset.get('symbol', ''),
-                'name': asset.get('name', ''),
-                'market_cap': float(asset.get('market_cap', 0)),
-                'market_cap_raw': float(asset.get('market_cap', 0)),
-                'current_price': float(asset.get('current_price', 0)),
-                'price_raw': float(asset.get('current_price', 0)),
-                'previous_close': float(asset.get('current_price', 0)),  # Crypto doesn't have previous close
-                'percentage_change': float(asset.get('price_change_percentage_24h', 0)),
-                'volume': float(asset.get('total_volume', 0)),
-                'primary_exchange': 'Multiple',
-                'country': 'Global',
-                'sector': 'Cryptocurrency',
-                'industry': 'Blockchain',
-                'circulating_supply': float(asset.get('circulating_supply', 0)),
-                'category': 'crypto',
-                'asset_type': 'crypto',
-                'data_source': data_source,
-                'image': asset.get('image', ''),
-                'snapshot_date': datetime.now().isoformat()
-            }
+        logger.info(f"📊 Loaded: {len(stock_data)} stocks, {len(crypto_data)} crypto")
         
-        else:
-            # Generic fallback
-            return {
-                'rank': 0,
-                'symbol': asset.get('symbol', asset.get('ticker', '')),
-                'ticker': asset.get('ticker', asset.get('symbol', '')),
-                'name': asset.get('name', ''),
-                'market_cap': float(asset.get('market_cap', 0)),
-                'market_cap_raw': float(asset.get('market_cap', 0)),
-                'current_price': float(asset.get('current_price', asset.get('price', 0))),
-                'price_raw': float(asset.get('current_price', asset.get('price', 0))),
-                'previous_close': float(asset.get('previous_close', asset.get('current_price', 0))),
-                'percentage_change': float(asset.get('percentage_change', 0)),
-                'volume': float(asset.get('volume', 0)),
-                'primary_exchange': asset.get('primary_exchange', ''),
-                'country': asset.get('country', ''),
-                'sector': asset.get('sector', ''),
-                'industry': asset.get('industry', ''),
-                'circulating_supply': asset.get('circulating_supply'),
-                'category': asset.get('asset_type', 'unknown'),
-                'asset_type': asset.get('asset_type', 'unknown'),
-                'data_source': data_source,
-                'image': asset.get('image', ''),
-                'snapshot_date': datetime.now().isoformat()
-            }
-    
-    def remove_duplicates(self, assets: List[Dict]) -> List[Dict]:
-        """Remove duplicate assets, keeping the one with highest market cap"""
-        seen = {}
-        
-        for asset in assets:
-            symbol = asset.get('symbol', '').upper()
-            name = asset.get('name', '').upper()
-            
-            # Create a key for deduplication
-            key = f"{symbol}|{name}"
-            
-            if key not in seen or asset['market_cap'] > seen[key]['market_cap']:
-                seen[key] = asset
-        
-        result = list(seen.values())
-        logger.info(f"🔄 Removed duplicates: {len(assets)} → {len(result)} unique assets")
-        return result
-    
-    def format_large_number(self, num: float) -> str:
-        """Format large numbers for display"""
-        if num >= 1e12:
-            return f"${num/1e12:.1f}T"
-        elif num >= 1e9:
-            return f"${num/1e9:.1f}B"
-        elif num >= 1e6:
-            return f"${num/1e6:.1f}M"
-        elif num >= 1e3:
-            return f"${num/1e3:.1f}K"
-        else:
-            return f"${num:.0f}"
-    
-    def combine_and_rank_assets(self) -> List[Dict]:
-        """Combine all asset types and rank by market cap"""
-        logger.info("🌍 Starting global asset combination and ranking...")
-        
+        # Combine all assets
         all_assets = []
+        all_assets.extend(stock_data)
+        all_assets.extend(crypto_data)
         
-        # Load traditional securities (stocks, commodities)
-        stock_files = [
-            "global_assets_fmp.json",
-            "global_assets_fmp_2025-07-03.json",
-            "global_assets_fmp_2025-07-02.json"
-        ]
+        logger.info(f"📈 Total assets before validation: {len(all_assets)}")
         
-        for filename in stock_files:
-            stock_data = self.load_json_file(filename)
-            if stock_data:
-                for asset in stock_data:
-                    standardized = self.standardize_asset_data(asset, "stock")
-                    all_assets.append(standardized)
-                break  # Use first available file
-        
-        # Load cryptocurrency data
-        crypto_files = [
-            "crypto_data.json",
-            "crypto_data_2025-07-03.json",
-            "crypto_data_2025-07-02.json"
-        ]
-        
-        for filename in crypto_files:
-            crypto_data = self.load_json_file(filename)
-            if crypto_data:
-                for asset in crypto_data:
-                    standardized = self.standardize_asset_data(asset, "crypto")
-                    all_assets.append(standardized)
-                break  # Use first available file
-        
-        # Remove duplicates
-        all_assets = self.remove_duplicates(all_assets)
-        
-        # Validate and fix market cap values before sorting
+        # Validate and fix market caps
         validated_assets = []
         for asset in all_assets:
-            market_cap = asset.get('market_cap', 0)
-            
-            # Skip assets with invalid market caps
-            if market_cap <= 0:
-                logger.warning(f"⚠️ Skipping {asset.get('symbol', 'Unknown')}: Invalid market cap ${market_cap}")
-                continue
-                
-            # Fix extreme market caps (currency conversion errors)
-            if market_cap > 1e15:  # > 1 quadrillion
-                logger.warning(f"⚠️ Fixing extreme market cap for {asset.get('symbol', 'Unknown')}: ${market_cap:,.0f}")
-                if market_cap > 1e16:  # Likely Indonesian Rupiah
-                    asset['market_cap'] = market_cap * 0.000065
-                    asset['market_cap_raw'] = asset['market_cap']
-                elif market_cap > 1e15:  # Likely Korean Won
-                    asset['market_cap'] = market_cap * 0.00075
-                    asset['market_cap_raw'] = asset['market_cap']
-                else:
-                    asset['market_cap'] = market_cap / 1000
-                    asset['market_cap_raw'] = asset['market_cap']
-                    
-            # Cap at reasonable maximum ($4T)
-            if asset['market_cap'] > 4e12:
-                logger.warning(f"⚠️ Capping market cap for {asset.get('symbol', 'Unknown')}: ${asset['market_cap']/1e12:.1f}T → $4.0T")
-                asset['market_cap'] = 4e12
-                asset['market_cap_raw'] = 4e12
-                
-            validated_assets.append(asset)
+            validated_asset = self.validate_and_fix_market_cap(asset)
+            if validated_asset:
+                validated_assets.append(validated_asset)
         
-        logger.info(f"✅ Validated assets: {len(all_assets)} → {len(validated_assets)}")
-        all_assets = validated_assets
+        logger.info(f"✅ Assets after validation: {len(validated_assets)}")
         
         # Sort by market cap (descending)
-        all_assets.sort(key=lambda x: x['market_cap'], reverse=True)
+        validated_assets.sort(key=lambda x: x.get('market_cap', 0), reverse=True)
         
-        # Assign ranks
-        for i, asset in enumerate(all_assets, 1):
-            asset['rank'] = i
+        # Take top 500
+        top_assets = validated_assets[:500]
         
-        # Limit to top 500
-        top_assets = all_assets[:500]
-        
-        logger.info(f"📊 Final ranking: {len(top_assets)} assets")
-        
-        # Show top 10
-        logger.info("🏆 Top 10 Global Assets:")
-        for i, asset in enumerate(top_assets[:10], 1):
-            logger.info(f"   {i:2d}. {asset['symbol']:8s} | {asset['name']:30s} | {self.format_large_number(asset['market_cap'])}")
+        # Add ranking
+        for i, asset in enumerate(top_assets):
+            asset['rank'] = i + 1
+            asset['snapshot_date'] = datetime.now().strftime('%Y-%m-%d')
+            
+            # Add missing fields with defaults
+            asset.setdefault('circulating_supply', None)
+            asset.setdefault('price_raw', asset.get('current_price', 0))
+            asset.setdefault('market_cap_raw', asset.get('market_cap', 0))
+            asset.setdefault('category', 'Global')
+            asset.setdefault('data_source', 'FMP')
         
         return top_assets
     
-    def save_combined_data(self, assets: List[Dict], filename: str = "all_assets_combined.json"):
-        """Save combined asset data to JSON file"""
+    def save_to_json(self, data: List[Dict], filename: str = 'all_assets_combined.json'):
+        """Save combined data to JSON file"""
         try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(assets, f, indent=2, ensure_ascii=False)
-            logger.info(f"💾 Saved {len(assets)} assets to {filename}")
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            logger.info(f"💾 Saved {len(data)} assets to {filename}")
         except Exception as e:
             logger.error(f"❌ Error saving to {filename}: {e}")
     
-    def upload_to_supabase(self, assets: List[Dict]) -> bool:
-        """Upload assets to Supabase database"""
-        if not self.supabase_client:
-            logger.warning("⚠️ Supabase client not available, skipping upload")
-            return False
+    def prepare_for_database(self, asset: Dict) -> Dict:
+        """Prepare asset data for database insertion with overflow protection"""
+        
+        # PostgreSQL bigint max value: 9,223,372,036,854,775,807
+        MAX_BIGINT = 9_223_372_036_854_775_807
+        
+        def safe_number(value, max_val=MAX_BIGINT):
+            if value is None:
+                return None
+            try:
+                num = float(value)
+                if num > max_val:
+                    return max_val
+                return num
+            except (ValueError, TypeError):
+                return None
+        
+        # Map fields and ensure safe values
+        db_asset = {
+            'symbol': str(asset.get('ticker', ''))[:50],
+            'ticker': str(asset.get('ticker', ''))[:50],
+            'name': str(asset.get('name', ''))[:200],
+            'current_price': safe_number(asset.get('current_price', 0)),
+            'previous_close': safe_number(asset.get('previous_close', 0)),
+            'percentage_change': safe_number(asset.get('percentage_change', 0)),
+            'market_cap': safe_number(asset.get('market_cap', 0)),
+            'volume': safe_number(asset.get('volume', 0)),
+            'circulating_supply': safe_number(asset.get('circulating_supply')),
+            'primary_exchange': str(asset.get('primary_exchange', ''))[:50],
+            'country': str(asset.get('country', ''))[:50],
+            'sector': str(asset.get('sector', ''))[:100],
+            'industry': str(asset.get('industry', ''))[:100],
+            'asset_type': str(asset.get('asset_type', 'unknown'))[:50],
+            'image': str(asset.get('image', ''))[:500],
+            'rank': int(asset.get('rank', 0)),
+            'snapshot_date': asset.get('snapshot_date', datetime.now().strftime('%Y-%m-%d')),
+            'price_raw': safe_number(asset.get('price_raw', 0)),
+            'market_cap_raw': safe_number(asset.get('market_cap_raw', 0)),
+            'category': str(asset.get('category', ''))[:50],
+            'data_source': str(asset.get('data_source', ''))[:50],
+        }
+        
+        return db_asset
+    
+    def upload_to_supabase(self, assets: List[Dict]):
+        """Upload assets to Supabase with error handling"""
+        if not self.supabase:
+            logger.warning("⚠️ No Supabase connection configured")
+            return
         
         try:
             # Clear existing data
             logger.info("🗑️ Clearing existing data...")
-            self.supabase_client.table('assets').delete().neq('id', 0).execute()
+            self.supabase.table('assets').delete().neq('id', 0).execute()
             
-            # Insert new data in batches
+            # Prepare data for database
+            db_assets = []
+            for asset in assets:
+                db_asset = self.prepare_for_database(asset)
+                db_assets.append(db_asset)
+            
+            # Upload in batches
             batch_size = 100
-            total_uploaded = 0
+            for i in range(0, len(db_assets), batch_size):
+                batch = db_assets[i:i+batch_size]
+                result = self.supabase.table('assets').insert(batch).execute()
+                logger.info(f"✅ Uploaded batch {i//batch_size + 1} ({len(batch)} assets)")
             
-            for i in range(0, len(assets), batch_size):
-                batch = assets[i:i+batch_size]
-                
-                # Remove None values and fix large numbers for database
-                clean_batch = []
-                for asset in batch:
-                    clean_asset = {}
-                    for k, v in asset.items():
-                        if v is not None:
-                            # Fix market cap values that are too large for database
-                            if k in ['market_cap', 'market_cap_raw'] and isinstance(v, (int, float)):
-                                # Convert to reasonable USD value
-                                if v > 1e15:  # > 1 quadrillion (definitely wrong)
-                                    logger.warning(f"⚠️ Fixing suspicious market cap for {asset.get('symbol', 'Unknown')}: ${v:,.0f}")
-                                    # Assume it's in wrong currency, divide by reasonable factor
-                                    if v > 1e16:  # Indonesian Rupiah likely
-                                        clean_asset[k] = v * 0.000065  # IDR to USD
-                                    elif v > 1e15:  # Maybe Korean Won
-                                        clean_asset[k] = v * 0.00075   # KRW to USD
-                                    else:
-                                        clean_asset[k] = v / 1000  # Generic large number fix
-                                # Cap at Apple's market cap (~$3.5T) as reasonable maximum
-                                elif v > 4e12:  # > $4 trillion
-                                    logger.warning(f"⚠️ Capping market cap for {asset.get('symbol', 'Unknown')}: ${v/1e12:.1f}T → $4.0T")
-                                    clean_asset[k] = 4e12
-                                else:
-                                    clean_asset[k] = int(v) if abs(v - int(v)) < 0.01 else v
-                            # Fix price values
-                            elif k in ['current_price', 'price_raw', 'previous_close'] and isinstance(v, (int, float)):
-                                if v > 1e6:  # Price > $1M per share (suspicious)
-                                    logger.warning(f"⚠️ Fixing suspicious price for {asset.get('symbol', 'Unknown')}: ${v:,.0f}")
-                                    clean_asset[k] = v * 0.000065 if v > 1e8 else v / 1000
-                                else:
-                                    clean_asset[k] = v
-                            # Fix volume values  
-                            elif k == 'volume' and isinstance(v, (int, float)):
-                                if v > 1e15:  # Extremely high volume
-                                    clean_asset[k] = min(v, 1e12)  # Cap at 1 trillion
-                                else:
-                                    clean_asset[k] = v
-                            else:
-                                clean_asset[k] = v
-                    clean_batch.append(clean_asset)
-                
-                self.supabase_client.table('assets').insert(clean_batch).execute()
-                total_uploaded += len(batch)
-                logger.info(f"📤 Uploaded batch {i//batch_size + 1}: {total_uploaded}/{len(assets)} assets")
-            
-            logger.info(f"✅ Successfully uploaded {total_uploaded} assets to Supabase")
-            return True
+            logger.info(f"🎯 Successfully uploaded {len(db_assets)} assets to Supabase")
             
         except Exception as e:
             logger.error(f"❌ Error uploading to Supabase: {e}")
-            return False
+            logger.warning("⚠️ Supabase upload failed")
+    
+    def print_summary(self, assets: List[Dict]):
+        """Print summary of the combined assets"""
+        if not assets:
+            logger.info("📊 No assets to summarize")
+            return
+        
+        logger.info(f"\n🎯 SUMMARY:")
+        logger.info(f"   📊 Total assets processed: {len(assets)}")
+        
+        # Asset type breakdown
+        asset_types = {}
+        for asset in assets:
+            asset_type = asset.get('asset_type', 'unknown')
+            asset_types[asset_type] = asset_types.get(asset_type, 0) + 1
+        
+        logger.info(f"   📈 Asset breakdown:")
+        for asset_type, count in sorted(asset_types.items()):
+            logger.info(f"      {asset_type}: {count}")
+        
+        # Top 10 assets
+        logger.info(f"   🏆 Top 10 assets by market cap:")
+        for i, asset in enumerate(assets[:10]):
+            market_cap = asset.get('market_cap', 0)
+            if market_cap >= 1e12:
+                cap_str = f"${market_cap/1e12:.1f}T"
+            else:
+                cap_str = f"${market_cap/1e9:.1f}B"
+            logger.info(f"     {i+1:2d}. {asset.get('ticker', 'N/A'):<12} | {asset.get('name', 'Unknown'):<30} | {cap_str}")
+        
+        # Check for major stocks
+        major_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'LVMUY', 'RHHVF']
+        found_in_top_50 = []
+        for asset in assets[:50]:
+            if asset.get('ticker') in major_stocks:
+                found_in_top_50.append(asset.get('ticker'))
+        
+        if len(found_in_top_50) >= 8:
+            logger.info(f"   ✅ Found {len(found_in_top_50)} major stocks in top 50: {', '.join(found_in_top_50)}")
+        else:
+            logger.info(f"   ⚠️ Major stocks not found in top 50")
     
     def run(self):
-        """Main execution function"""
+        """Main execution method"""
         logger.info("🚀 Starting Global Asset Ranking System")
         
-        # Combine and rank assets
-        combined_assets = self.combine_and_rank_assets()
+        # Combine all assets
+        combined_assets = self.combine_all_assets()
         
         if not combined_assets:
             logger.error("❌ No assets to process")
             return
         
-        # Save to JSON file
-        self.save_combined_data(combined_assets)
+        # Save to JSON
+        self.save_to_json(combined_assets)
         
         # Upload to Supabase
-        if self.supabase_client:
-            upload_success = self.upload_to_supabase(combined_assets)
-            if upload_success:
-                logger.info("✅ Data successfully uploaded to Supabase")
-            else:
-                logger.warning("⚠️ Supabase upload failed")
+        self.upload_to_supabase(combined_assets)
         
-        # Summary
-        logger.info("\n🎯 SUMMARY:")
-        logger.info(f"   📊 Total assets processed: {len(combined_assets)}")
-        
-        # Count by category
-        categories = {}
-        for asset in combined_assets:
-            category = asset.get('category', 'unknown')
-            categories[category] = categories.get(category, 0) + 1
-        
-        logger.info(f"   📈 Asset breakdown:")
-        for category, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
-            logger.info(f"      {category}: {count}")
-        
-        # Check for major stocks
-        major_stocks = ['NFLX', 'MC.PA', 'RMS.PA', 'ASML.AS', 'NOVO-B.CO']
-        found_stocks = []
-        
-        for asset in combined_assets[:50]:  # Check top 50
-            if asset.get('symbol') in major_stocks:
-                found_stocks.append(f"{asset['symbol']} (#{asset['rank']})")
-        
-        if found_stocks:
-            logger.info(f"   🎯 Found major stocks: {', '.join(found_stocks)}")
-        else:
-            logger.info(f"   ⚠️ Major stocks not found in top 50")
+        # Print summary
+        self.print_summary(combined_assets)
         
         logger.info("✅ Global Asset Ranking System completed successfully!")
 
-def main():
-    combiner = GlobalAssetCombiner()
-    combiner.run()
-
 if __name__ == "__main__":
-    main() 
+    combiner = AssetCombiner()
+    combiner.run() 
