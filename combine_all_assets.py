@@ -218,6 +218,40 @@ class GlobalAssetCombiner:
         # Remove duplicates
         all_assets = self.remove_duplicates(all_assets)
         
+        # Validate and fix market cap values before sorting
+        validated_assets = []
+        for asset in all_assets:
+            market_cap = asset.get('market_cap', 0)
+            
+            # Skip assets with invalid market caps
+            if market_cap <= 0:
+                logger.warning(f"⚠️ Skipping {asset.get('symbol', 'Unknown')}: Invalid market cap ${market_cap}")
+                continue
+                
+            # Fix extreme market caps (currency conversion errors)
+            if market_cap > 1e15:  # > 1 quadrillion
+                logger.warning(f"⚠️ Fixing extreme market cap for {asset.get('symbol', 'Unknown')}: ${market_cap:,.0f}")
+                if market_cap > 1e16:  # Likely Indonesian Rupiah
+                    asset['market_cap'] = market_cap * 0.000065
+                    asset['market_cap_raw'] = asset['market_cap']
+                elif market_cap > 1e15:  # Likely Korean Won
+                    asset['market_cap'] = market_cap * 0.00075
+                    asset['market_cap_raw'] = asset['market_cap']
+                else:
+                    asset['market_cap'] = market_cap / 1000
+                    asset['market_cap_raw'] = asset['market_cap']
+                    
+            # Cap at reasonable maximum ($4T)
+            if asset['market_cap'] > 4e12:
+                logger.warning(f"⚠️ Capping market cap for {asset.get('symbol', 'Unknown')}: ${asset['market_cap']/1e12:.1f}T → $4.0T")
+                asset['market_cap'] = 4e12
+                asset['market_cap_raw'] = 4e12
+                
+            validated_assets.append(asset)
+        
+        logger.info(f"✅ Validated assets: {len(all_assets)} → {len(validated_assets)}")
+        all_assets = validated_assets
+        
         # Sort by market cap (descending)
         all_assets.sort(key=lambda x: x['market_cap'], reverse=True)
         
@@ -264,10 +298,45 @@ class GlobalAssetCombiner:
             for i in range(0, len(assets), batch_size):
                 batch = assets[i:i+batch_size]
                 
-                # Remove None values and convert to proper format
+                # Remove None values and fix large numbers for database
                 clean_batch = []
                 for asset in batch:
-                    clean_asset = {k: v for k, v in asset.items() if v is not None}
+                    clean_asset = {}
+                    for k, v in asset.items():
+                        if v is not None:
+                            # Fix market cap values that are too large for database
+                            if k in ['market_cap', 'market_cap_raw'] and isinstance(v, (int, float)):
+                                # Convert to reasonable USD value
+                                if v > 1e15:  # > 1 quadrillion (definitely wrong)
+                                    logger.warning(f"⚠️ Fixing suspicious market cap for {asset.get('symbol', 'Unknown')}: ${v:,.0f}")
+                                    # Assume it's in wrong currency, divide by reasonable factor
+                                    if v > 1e16:  # Indonesian Rupiah likely
+                                        clean_asset[k] = v * 0.000065  # IDR to USD
+                                    elif v > 1e15:  # Maybe Korean Won
+                                        clean_asset[k] = v * 0.00075   # KRW to USD
+                                    else:
+                                        clean_asset[k] = v / 1000  # Generic large number fix
+                                # Cap at Apple's market cap (~$3.5T) as reasonable maximum
+                                elif v > 4e12:  # > $4 trillion
+                                    logger.warning(f"⚠️ Capping market cap for {asset.get('symbol', 'Unknown')}: ${v/1e12:.1f}T → $4.0T")
+                                    clean_asset[k] = 4e12
+                                else:
+                                    clean_asset[k] = int(v) if abs(v - int(v)) < 0.01 else v
+                            # Fix price values
+                            elif k in ['current_price', 'price_raw', 'previous_close'] and isinstance(v, (int, float)):
+                                if v > 1e6:  # Price > $1M per share (suspicious)
+                                    logger.warning(f"⚠️ Fixing suspicious price for {asset.get('symbol', 'Unknown')}: ${v:,.0f}")
+                                    clean_asset[k] = v * 0.000065 if v > 1e8 else v / 1000
+                                else:
+                                    clean_asset[k] = v
+                            # Fix volume values  
+                            elif k == 'volume' and isinstance(v, (int, float)):
+                                if v > 1e15:  # Extremely high volume
+                                    clean_asset[k] = min(v, 1e12)  # Cap at 1 trillion
+                                else:
+                                    clean_asset[k] = v
+                            else:
+                                clean_asset[k] = v
                     clean_batch.append(clean_asset)
                 
                 self.supabase_client.table('assets').insert(clean_batch).execute()

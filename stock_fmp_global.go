@@ -580,12 +580,10 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 			continue
 		}
 		
-		// Additional filter for emerging market data quality issues
-		// Indonesian stocks often have inflated market cap data in FMP
-		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") && marketCapUSD > 100e9 {
-			fmt.Printf("⚠️  Skipping %s: Indonesian stock with suspicious market cap ($%.1fB)\n", 
-				stock.Symbol, marketCapUSD/1e9)
-			continue
+		// Debug: Show currency conversion for Indonesian stocks
+		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") {
+			fmt.Printf("🇮🇩 %s: %.0f IDR → $%.2fB USD (rate: %.6f)\n", 
+				stock.Symbol, stock.MarketCap, marketCapUSD/1e9, c.getUSDExchangeRate(currencyCode))
 		}
 		
 		// Small delay to avoid hitting API rate limits
