@@ -172,6 +172,93 @@ func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error)
 
 
 
+// Helper function to determine which listing to keep for duplicate companies
+func shouldKeepNewListing(newStock, existingStock FMPStockScreener) bool {
+	newPriority := getListingPriority(newStock.Symbol, newStock.ExchangeShortName)
+	existingPriority := getListingPriority(existingStock.Symbol, existingStock.ExchangeShortName)
+	
+	// Lower number = higher priority
+	if newPriority < existingPriority {
+		return true
+	} else if newPriority == existingPriority {
+		// Same priority, keep the one with higher market cap
+		return newStock.MarketCap > existingStock.MarketCap
+	}
+	return false
+}
+
+// Get listing priority (lower number = higher priority)
+func getListingPriority(symbol, exchange string) int {
+	symbolUpper := strings.ToUpper(symbol)
+	exchangeUpper := strings.ToUpper(exchange)
+	
+	// Hong Kong main listings (highest priority)
+	if strings.HasSuffix(symbolUpper, ".HK") || exchangeUpper == "HKSE" {
+		return 1
+	}
+	
+	// US ADRs (second priority)
+	if (exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE") && 
+	   (strings.HasSuffix(symbolUpper, "Y") || strings.HasSuffix(symbolUpper, "H")) {
+		return 2
+	}
+	
+	// US main listings (third priority)
+	if exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE" {
+		return 3
+	}
+	
+	// US OTC (fourth priority)
+	if exchangeUpper == "OTC" || strings.HasSuffix(symbolUpper, "F") {
+		return 4
+	}
+	
+	// European listings (lower priority)
+	if strings.HasSuffix(symbolUpper, ".VI") || strings.HasSuffix(symbolUpper, ".L") || 
+	   strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") {
+		return 5
+	}
+	
+	// Other exchanges (lowest priority)
+	return 6
+}
+
+// Get current exchange rate from FMP or use fallback
+func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
+	// Try to get real-time exchange rate from FMP
+	endpoint := fmt.Sprintf("/v3/fx/%sUSD", fromCurrency)
+	
+	body, err := c.makeRequest(endpoint)
+	if err == nil {
+		var fxData []struct {
+			Bid float64 `json:"bid"`
+			Ask float64 `json:"ask"`
+		}
+		if json.Unmarshal(body, &fxData) == nil && len(fxData) > 0 {
+			// Use mid-price (average of bid and ask)
+			return (fxData[0].Bid + fxData[0].Ask) / 2
+		}
+	}
+	
+	// Fallback to approximate rates (updated regularly)
+	fallbackRates := map[string]float64{
+		"HKD": 0.128,  // 1 HKD = ~0.128 USD
+		"EUR": 1.08,   // 1 EUR = ~1.08 USD  
+		"GBP": 1.26,   // 1 GBP = ~1.26 USD
+		"JPY": 0.0067, // 1 JPY = ~0.0067 USD
+		"CAD": 0.74,   // 1 CAD = ~0.74 USD
+		"AUD": 0.64,   // 1 AUD = ~0.64 USD
+		"CNY": 0.14,   // 1 CNY = ~0.14 USD
+	}
+	
+	if rate, exists := fallbackRates[fromCurrency]; exists {
+		return rate
+	}
+	
+	// If unknown currency, assume it's already in USD
+	return 1.0
+}
+
 func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 	fmt.Println("🌍 Fetching ALL stocks from ALL countries...")
 	
@@ -208,18 +295,31 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 
 	fmt.Printf("✅ Combined total: %d stocks from all regions\n", len(allScreenerData))
 
-	// Remove duplicates based on symbol
-	seen := make(map[string]bool)
+	// Remove duplicates based on company name AND symbol
+	// Priority: HK main listing > US ADR > US OTC > European
+	companyNames := make(map[string]FMPStockScreener)
 	var uniqueScreenerData []FMPStockScreener
 	
 	for _, stock := range allScreenerData {
-		if !seen[stock.Symbol] {
-			seen[stock.Symbol] = true
-			uniqueScreenerData = append(uniqueScreenerData, stock)
+		companyKey := strings.ToLower(stock.CompanyName)
+		
+		// Check if we've seen this company before
+		if existingStock, exists := companyNames[companyKey]; exists {
+			// Keep the better listing (HK > US ADR > US OTC > European)
+			if shouldKeepNewListing(stock, existingStock) {
+				companyNames[companyKey] = stock
+			}
+		} else {
+			companyNames[companyKey] = stock
 		}
 	}
 	
-	fmt.Printf("🔄 Removed duplicates: %d unique stocks\n", len(uniqueScreenerData))
+	// Convert map back to slice
+	for _, stock := range companyNames {
+		uniqueScreenerData = append(uniqueScreenerData, stock)
+	}
+	
+	fmt.Printf("🔄 Removed duplicates: %d unique companies\n", len(uniqueScreenerData))
 
 	// Sort by market cap descending to ensure we get the largest companies first
 	sort.Slice(uniqueScreenerData, func(i, j int) bool {
@@ -282,15 +382,56 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 			imageURL = profile.Image
 		}
 		
+		// Convert all prices to USD for proper ranking
+		currentPrice := stock.Price
+		previousCloseUSD := previousClose
+		
+		// Determine currency and convert to USD
+		var currencyCode string
+		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".HK") || 
+		   strings.ToUpper(stock.ExchangeShortName) == "HKSE" ||
+		   strings.ToUpper(stock.Country) == "HK" {
+			currencyCode = "HKD"
+		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".L") ||
+		          strings.ToUpper(stock.ExchangeShortName) == "LSE" {
+			currencyCode = "GBP"
+		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".PA") ||
+		          strings.HasSuffix(strings.ToUpper(stock.Symbol), ".DE") ||
+		          strings.Contains(strings.ToUpper(stock.ExchangeShortName), "EUR") {
+			currencyCode = "EUR"
+		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".T") ||
+		          strings.ToUpper(stock.Country) == "JP" {
+			currencyCode = "JPY"
+		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".TO") ||
+		          strings.ToUpper(stock.Country) == "CA" {
+			currencyCode = "CAD"
+		} else if strings.ToUpper(stock.Country) == "CN" {
+			currencyCode = "CNY"
+		} else {
+			currencyCode = "USD" // Default to USD
+		}
+		
+		// Convert to USD if not already in USD
+		if currencyCode != "USD" {
+			exchangeRate := c.getUSDExchangeRate(currencyCode)
+			currentPrice = stock.Price * exchangeRate
+			previousCloseUSD = previousClose * exchangeRate
+			// Only show conversion for major stocks (top 10 by market cap) to avoid spam
+			if stockCount < 10 {
+				fmt.Printf("💱 %s: %.2f %s → $%.2f USD\n", 
+					stock.Symbol, stock.Price, currencyCode, currentPrice)
+			}
+		}
+		
 		// Small delay to avoid hitting API rate limits
 		time.Sleep(100 * time.Millisecond) // Increased delay due to more API calls
 
 		asset := AssetData{
 			Ticker:           stock.Symbol,
 			Name:             stock.CompanyName,
-			MarketCap:        stock.MarketCap,
-			CurrentPrice:     stock.Price,
-			PreviousClose:    previousClose,
+			MarketCap:        stock.MarketCap, // Should already be in USD from FMP
+			CurrentPrice:     currentPrice,    // Now converted to USD
+			PreviousClose:    previousCloseUSD, // Now converted to USD
 			PercentageChange: percentageChange,
 			Volume:           stock.Volume,
 			PrimaryExchange:  stock.ExchangeShortName,
@@ -543,6 +684,8 @@ func main() {
 	fmt.Println("🌍 ALL Countries (US, EU, Asia, Hong Kong, etc.)")
 	fmt.Println("🏢 ALL Exchanges (NYSE, NASDAQ, LSE, SEHK, etc.)")
 	fmt.Println("🥇 Plus Essential Commodities (Gold, Silver, etc.)")
+	fmt.Println("🔄 Smart Deduplication (HK main > US ADR > US OTC > EU)")
+	fmt.Println("💵 All prices standardized to USD for accurate ranking")
 	fmt.Println("⚠️  Excluding: ETFs, Index Funds, Mutual Funds")
 	fmt.Println()
 	
