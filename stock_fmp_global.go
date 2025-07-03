@@ -175,24 +175,55 @@ func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error)
 func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 	fmt.Println("🌍 Fetching ALL stocks from ALL countries...")
 	
-	// Get maximum stocks from all countries, all exchanges
-	endpoint := "/v3/stock-screener?marketCapMoreThan=1000000&limit=50000&order=desc&sortBy=marketcap&isActivelyTrading=true"
+	// Make multiple API calls to ensure comprehensive global coverage
+	endpoints := []struct {
+		url string
+		desc string
+	}{
+		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=10000&order=desc&sortBy=marketcap&isActivelyTrading=true", "Global (Default)"},
+		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=HK", "Hong Kong"},
+		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CN", "China"},
+	}
 	
-	body, err := c.makeRequest(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stock screener data: %w", err)
+	var allScreenerData []FMPStockScreener
+	
+	for i, endpoint := range endpoints {
+		fmt.Printf("📡 Fetching %s stocks (%d/%d)...\n", endpoint.desc, i+1, len(endpoints))
+		
+		body, err := c.makeRequest(endpoint.url)
+		if err != nil {
+			fmt.Printf("⚠️  Warning: Failed to fetch %s stocks: %v\n", endpoint.desc, err)
+			continue
+		}
+
+		var screenerData []FMPStockScreener
+		if err := json.Unmarshal(body, &screenerData); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to parse %s stocks: %v\n", endpoint.desc, err)
+			continue
+		}
+
+		fmt.Printf("✅ %s: %d stocks\n", endpoint.desc, len(screenerData))
+		allScreenerData = append(allScreenerData, screenerData...)
 	}
 
-	var screenerData []FMPStockScreener
-	if err := json.Unmarshal(body, &screenerData); err != nil {
-		return nil, fmt.Errorf("failed to parse screener data: %w", err)
-	}
+	fmt.Printf("✅ Combined total: %d stocks from all regions\n", len(allScreenerData))
 
-	fmt.Printf("✅ Received %d securities from stock screener\n", len(screenerData))
+	// Remove duplicates based on symbol
+	seen := make(map[string]bool)
+	var uniqueScreenerData []FMPStockScreener
+	
+	for _, stock := range allScreenerData {
+		if !seen[stock.Symbol] {
+			seen[stock.Symbol] = true
+			uniqueScreenerData = append(uniqueScreenerData, stock)
+		}
+	}
+	
+	fmt.Printf("🔄 Removed duplicates: %d unique stocks\n", len(uniqueScreenerData))
 
 	// Sort by market cap descending to ensure we get the largest companies first
-	sort.Slice(screenerData, func(i, j int) bool {
-		return screenerData[i].MarketCap > screenerData[j].MarketCap
+	sort.Slice(uniqueScreenerData, func(i, j int) bool {
+		return uniqueScreenerData[i].MarketCap > uniqueScreenerData[j].MarketCap
 	})
 	fmt.Printf("📊 Sorted by market cap (largest first)\n")
 
@@ -200,7 +231,7 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 	stockCount := 0
 	maxStocks := 490 // Increased to get ~500 total assets (490 stocks + 10 crypto)
 	
-	for _, stock := range screenerData {
+	for _, stock := range uniqueScreenerData {
 		if stockCount >= maxStocks {
 			break
 		}
