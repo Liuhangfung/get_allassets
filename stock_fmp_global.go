@@ -412,14 +412,18 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 		}
 		
 		// Convert to USD if not already in USD
+		marketCapUSD := stock.MarketCap
 		if currencyCode != "USD" {
 			exchangeRate := c.getUSDExchangeRate(currencyCode)
 			currentPrice = stock.Price * exchangeRate
 			previousCloseUSD = previousClose * exchangeRate
+			marketCapUSD = stock.MarketCap * exchangeRate // Convert market cap too!
+			
 			// Only show conversion for major stocks (top 10 by market cap) to avoid spam
 			if stockCount < 10 {
-				fmt.Printf("💱 %s: %.2f %s → $%.2f USD\n", 
-					stock.Symbol, stock.Price, currencyCode, currentPrice)
+				fmt.Printf("💱 %s: %.2f %s → $%.2f USD | Market Cap: %.1fT %s → $%.1fB USD\n", 
+					stock.Symbol, stock.Price, currencyCode, currentPrice,
+					stock.MarketCap/1e12, currencyCode, marketCapUSD/1e9)
 			}
 		}
 		
@@ -429,8 +433,8 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 		asset := AssetData{
 			Ticker:           stock.Symbol,
 			Name:             stock.CompanyName,
-			MarketCap:        stock.MarketCap, // Should already be in USD from FMP
-			CurrentPrice:     currentPrice,    // Now converted to USD
+			MarketCap:        marketCapUSD,     // Now converted to USD
+			CurrentPrice:     currentPrice,     // Now converted to USD
 			PreviousClose:    previousCloseUSD, // Now converted to USD
 			PercentageChange: percentageChange,
 			Volume:           stock.Volume,
@@ -460,6 +464,17 @@ func isRealCommodity(name, symbol string) bool {
 	nameUpper := strings.ToUpper(name)
 	symbolUpper := strings.ToUpper(symbol)
 	
+	// FIRST: Exclude micro contracts explicitly (to prevent duplicates)
+	excludedSymbols := map[string]bool{
+		"MGCUSD":  true,  // Micro Gold (duplicate of GCUSD)
+		"SILUSD":  true,  // Micro Silver (duplicate of SIUSD)
+	}
+	
+	// Check exclusion FIRST before anything else
+	if excludedSymbols[symbolUpper] {
+		return false
+	}
+	
 	// Essential commodities we want (matching FMP names and symbols exactly)
 	essentialCommodities := map[string]bool{
 		// Metals only (name contains)
@@ -484,9 +499,6 @@ func isRealCommodity(name, symbol string) bool {
 		"PLUSD":   true,  // Platinum
 		"PAUSD":   true,  // Palladium
 		"HGUSD":   true,  // Copper
-		// Excluding micro contracts to avoid duplicates:
-		// "MGCUSD":  Micro Gold Futures (duplicate of GCUSD)
-		// "SILUSD":  Micro Silver Futures (duplicate of SIUSD)
 	}
 	
 	// Check for exact symbol match
