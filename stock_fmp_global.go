@@ -277,13 +277,23 @@ func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
 	
 	// Fallback to approximate rates (updated regularly)
 	fallbackRates := map[string]float64{
-		"HKD": 0.128,  // 1 HKD = ~0.128 USD
-		"EUR": 1.08,   // 1 EUR = ~1.08 USD  
-		"GBP": 1.26,   // 1 GBP = ~1.26 USD
-		"JPY": 0.0067, // 1 JPY = ~0.0067 USD
-		"CAD": 0.74,   // 1 CAD = ~0.74 USD
-		"AUD": 0.64,   // 1 AUD = ~0.64 USD
-		"CNY": 0.14,   // 1 CNY = ~0.14 USD
+		"HKD": 0.128,     // 1 HKD = ~0.128 USD
+		"EUR": 1.08,      // 1 EUR = ~1.08 USD  
+		"GBP": 1.26,      // 1 GBP = ~1.26 USD
+		"JPY": 0.0067,    // 1 JPY = ~0.0067 USD
+		"CAD": 0.74,      // 1 CAD = ~0.74 USD
+		"AUD": 0.64,      // 1 AUD = ~0.64 USD
+		"CNY": 0.14,      // 1 CNY = ~0.14 USD
+		"IDR": 0.000065,  // 1 IDR = ~0.000065 USD (about 15,400 IDR = 1 USD)
+		"INR": 0.012,     // 1 INR = ~0.012 USD (about 83 INR = 1 USD)
+		"KRW": 0.00075,   // 1 KRW = ~0.00075 USD (about 1,330 KRW = 1 USD)
+		"BRL": 0.18,      // 1 BRL = ~0.18 USD (about 5.5 BRL = 1 USD)
+		"MXN": 0.058,     // 1 MXN = ~0.058 USD (about 17 MXN = 1 USD)
+		"ZAR": 0.055,     // 1 ZAR = ~0.055 USD (about 18 ZAR = 1 USD)
+		"THB": 0.029,     // 1 THB = ~0.029 USD (about 34 THB = 1 USD)
+		"MYR": 0.22,      // 1 MYR = ~0.22 USD (about 4.5 MYR = 1 USD)
+		"PHP": 0.018,     // 1 PHP = ~0.018 USD (about 56 PHP = 1 USD)
+		"VND": 0.000040,  // 1 VND = ~0.000040 USD (about 25,000 VND = 1 USD)
 	}
 	
 	if rate, exists := fallbackRates[fromCurrency]; exists {
@@ -521,6 +531,27 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 			currencyCode = "CAD"
 		} else if strings.ToUpper(stock.Country) == "CN" {
 			currencyCode = "CNY"
+		} else if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") ||
+		          strings.ToUpper(stock.Country) == "ID" {
+			currencyCode = "IDR"
+		} else if strings.ToUpper(stock.Country) == "IN" {
+			currencyCode = "INR"
+		} else if strings.ToUpper(stock.Country) == "KR" {
+			currencyCode = "KRW"
+		} else if strings.ToUpper(stock.Country) == "BR" {
+			currencyCode = "BRL"
+		} else if strings.ToUpper(stock.Country) == "MX" {
+			currencyCode = "MXN"
+		} else if strings.ToUpper(stock.Country) == "ZA" {
+			currencyCode = "ZAR"
+		} else if strings.ToUpper(stock.Country) == "TH" {
+			currencyCode = "THB"
+		} else if strings.ToUpper(stock.Country) == "MY" {
+			currencyCode = "MYR"
+		} else if strings.ToUpper(stock.Country) == "PH" {
+			currencyCode = "PHP"
+		} else if strings.ToUpper(stock.Country) == "VN" {
+			currencyCode = "VND"
 		} else {
 			currencyCode = "USD" // Default to USD
 		}
@@ -539,6 +570,22 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 					stock.Symbol, stock.Price, currencyCode, currentPrice,
 					stock.MarketCap/1e12, currencyCode, marketCapUSD/1e9)
 			}
+		}
+		
+		// Sanity check: Skip if market cap is unrealistically large (> $10 trillion)
+		// This prevents currency conversion errors from corrupting the ranking
+		if marketCapUSD > 10e12 {
+			fmt.Printf("⚠️  Skipping %s: Market cap too large ($%.1fT) - likely currency conversion error\n", 
+				stock.Symbol, marketCapUSD/1e12)
+			continue
+		}
+		
+		// Additional filter for emerging market data quality issues
+		// Indonesian stocks often have inflated market cap data in FMP
+		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") && marketCapUSD > 100e9 {
+			fmt.Printf("⚠️  Skipping %s: Indonesian stock with suspicious market cap ($%.1fB)\n", 
+				stock.Symbol, marketCapUSD/1e9)
+			continue
 		}
 		
 		// Small delay to avoid hitting API rate limits
