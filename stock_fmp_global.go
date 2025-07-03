@@ -295,22 +295,79 @@ func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
 }
 
 func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
-	fmt.Println("🌍 Fetching ALL stocks from ALL countries...")
+	fmt.Println("🌍 Fetching ALL stocks from ALL countries systematically...")
 	
-	// Make multiple API calls to ensure comprehensive global coverage
+	// Comprehensive country-by-country approach (Ultimate plan = 3000 requests/minute)
 	endpoints := []struct {
 		url string
 		desc string
 	}{
+		// Major Markets (High Priority)
 		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=10000&order=desc&sortBy=marketcap&isActivelyTrading=true", "Global (Default)"},
-		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=HK", "Hong Kong"},
-		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CN", "China"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=US", "United States"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CN", "China"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=HK", "Hong Kong"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=JP", "Japan"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IN", "India"},
+		
+		// European Markets (Netflix, LVMH, Hermès should be here)
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=GB", "United Kingdom"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=FR", "France"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=DE", "Germany"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CH", "Switzerland"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NL", "Netherlands"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IT", "Italy"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ES", "Spain"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SE", "Sweden"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=DK", "Denmark"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NO", "Norway"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=FI", "Finland"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=BE", "Belgium"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AT", "Austria"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PL", "Poland"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IE", "Ireland"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PT", "Portugal"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=GR", "Greece"},
+		
+		// Asia-Pacific Markets
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=KR", "South Korea"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TW", "Taiwan"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SG", "Singapore"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AU", "Australia"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NZ", "New Zealand"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TH", "Thailand"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=MY", "Malaysia"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ID", "Indonesia"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PH", "Philippines"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=VN", "Vietnam"},
+		
+		// Americas
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CA", "Canada"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=BR", "Brazil"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=MX", "Mexico"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AR", "Argentina"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CL", "Chile"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CO", "Colombia"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PE", "Peru"},
+		
+		// Middle East & Africa
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IL", "Israel"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SA", "Saudi Arabia"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AE", "UAE"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ZA", "South Africa"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=EG", "Egypt"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TR", "Turkey"},
+		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=RU", "Russia"},
 	}
 	
 	var allScreenerData []FMPStockScreener
+	totalRequests := len(endpoints)
+	successfulRequests := 0
+	
+	fmt.Printf("📊 Making %d API calls to fetch global stocks...\n", totalRequests)
 	
 	for i, endpoint := range endpoints {
-		fmt.Printf("📡 Fetching %s stocks (%d/%d)...\n", endpoint.desc, i+1, len(endpoints))
+		fmt.Printf("📡 [%d/%d] Fetching %s stocks...\n", i+1, totalRequests, endpoint.desc)
 		
 		body, err := c.makeRequest(endpoint.url)
 		if err != nil {
@@ -326,9 +383,29 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 
 		fmt.Printf("✅ %s: %d stocks\n", endpoint.desc, len(screenerData))
 		allScreenerData = append(allScreenerData, screenerData...)
+		successfulRequests++
+		
+		// Rate limiting: Ultimate plan = 3000 requests/minute = 50 requests/second
+		// We'll be conservative and limit to 20 requests/second to be safe
+		if i < len(endpoints)-1 { // Don't sleep after the last request
+			time.Sleep(50 * time.Millisecond) // 20 requests per second
+		}
+		
+		// Progress update every 10 requests
+		if (i+1)%10 == 0 {
+			fmt.Printf("📈 Progress: %d/%d markets completed (%d total stocks so far)\n", 
+				i+1, totalRequests, len(allScreenerData))
+		}
 	}
+	
+	fmt.Printf("🎯 API Summary: %d/%d successful requests\n", successfulRequests, totalRequests)
 
 	fmt.Printf("✅ Combined total: %d stocks from all regions\n", len(allScreenerData))
+
+	// If stock screener returned very few results, warn but continue
+	if len(allScreenerData) < 1000 {
+		fmt.Printf("⚠️  Warning: Only got %d stocks from screener. Expected more with global coverage.\n", len(allScreenerData))
+	}
 
 	// Remove duplicates based on company name AND symbol
 	// Priority: HK main listing > US ADR > US OTC > European
@@ -364,7 +441,9 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 
 	var assets []AssetData
 	stockCount := 0
-	maxStocks := 490 // Increased to get ~500 total assets (490 stocks + 10 crypto)
+	maxStocks := 490 // Target ~500 total assets (490 stocks + 10 crypto)
+	
+	fmt.Printf("🎯 Processing top %d stocks by market cap from %d unique companies...\n", maxStocks, len(uniqueScreenerData))
 	
 	for _, stock := range uniqueScreenerData {
 		if stockCount >= maxStocks {
@@ -714,6 +793,8 @@ func formatLargeNumber(num float64) string {
 	return fmt.Sprintf("%.0f", num)
 }
 
+
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: No .env file found, using environment variables")
@@ -767,8 +848,6 @@ func main() {
 		allAssets = append(allAssets, commodities...)
 		mu.Unlock()
 	}()
-	
-
 	
 	wg.Wait()
 	
