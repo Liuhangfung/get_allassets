@@ -170,64 +170,13 @@ func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error)
 	return &profiles[0], nil
 }
 
-func (c *FMPClient) GetHongKongStocks() ([]AssetData, error) {
-	fmt.Println("🇭🇰 Fetching Hong Kong stocks from SEHK...")
-	
-	endpoint := "/v3/quotes/SEHK" // Hong Kong Stock Exchange
-	
-	body, err := c.makeRequest(endpoint)
-	if err != nil {
-		fmt.Printf("⚠️  Hong Kong stocks not available: %v\n", err)
-		return []AssetData{}, nil // Return empty instead of error
-	}
 
-	var quotes []FMPQuote
-	if err := json.Unmarshal(body, &quotes); err != nil {
-		fmt.Printf("⚠️  Failed to parse Hong Kong data: %v\n", err)
-		return []AssetData{}, nil
-	}
-
-	fmt.Printf("✅ Received %d Hong Kong stocks\n", len(quotes))
-
-	var assets []AssetData
-	for _, quote := range quotes {
-		// Filter for significant market cap (HKD 100M+)
-		if quote.MarketCap < 100000000 { // 100M HKD ≈ 13M USD
-			continue
-		}
-
-		asset := AssetData{
-			Ticker:           quote.Symbol,
-			Name:             quote.Name,
-			MarketCap:        quote.MarketCap,
-			CurrentPrice:     quote.Price,
-			PreviousClose:    quote.PreviousClose,
-			PercentageChange: quote.ChangesPercentage,
-			Volume:           quote.Volume,
-			PrimaryExchange:  "SEHK",
-			Country:          "Hong Kong",
-			Sector:           "",
-			Industry:         "",
-			AssetType:        "stock",
-			Image:            "",
-		}
-
-		assets = append(assets, asset)
-	}
-
-	// Sort Hong Kong stocks by market cap
-	sort.Slice(assets, func(i, j int) bool {
-		return assets[i].MarketCap > assets[j].MarketCap
-	})
-
-	fmt.Printf("✅ Processed %d Hong Kong stocks (market cap > 100M HKD)\n", len(assets))
-	return assets, nil
-}
 
 func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
-	fmt.Println("🌍 Fetching global stocks from FMP...")
+	fmt.Println("🌍 Fetching ALL stocks from ALL countries...")
 	
-	endpoint := "/v3/stock-screener?marketCapMoreThan=100000&limit=10000&order=desc&sortBy=marketcap&isActivelyTrading=true"
+	// Get maximum stocks from all countries, all exchanges
+	endpoint := "/v3/stock-screener?marketCapMoreThan=1000000&limit=50000&order=desc&sortBy=marketcap&isActivelyTrading=true"
 	
 	body, err := c.makeRequest(endpoint)
 	if err != nil {
@@ -559,11 +508,10 @@ func main() {
 	client := NewFMPClient(apiKey)
 
 	fmt.Println("🌟 GLOBAL MARKET ANALYSIS WITH FMP API")
-	fmt.Println("Fetching individual assets from worldwide markets:")
-	fmt.Println("🌍 Individual Stocks (US, EU, Asia, etc.)")
-	fmt.Println("🇭🇰 Hong Kong Stocks (SEHK)")
-	fmt.Println("🥇 Commodities (Gold, Silver, Oil, etc.)")
-	fmt.Println("🏢 REITs and other individual securities")
+	fmt.Println("Fetching top 500 individual stocks by market cap globally:")
+	fmt.Println("🌍 ALL Countries (US, EU, Asia, Hong Kong, etc.)")
+	fmt.Println("🏢 ALL Exchanges (NYSE, NASDAQ, LSE, SEHK, etc.)")
+	fmt.Println("🥇 Plus Essential Commodities (Gold, Silver, etc.)")
 	fmt.Println("⚠️  Excluding: ETFs, Index Funds, Mutual Funds")
 	fmt.Println()
 	
@@ -599,18 +547,7 @@ func main() {
 		mu.Unlock()
 	}()
 	
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		hkStocks, err := client.GetHongKongStocks()
-		if err != nil {
-			fmt.Printf("❌ Failed to fetch Hong Kong stocks: %v\n", err)
-			return
-		}
-		mu.Lock()
-		allAssets = append(allAssets, hkStocks...)
-		mu.Unlock()
-	}()
+
 	
 	wg.Wait()
 	
@@ -618,8 +555,37 @@ func main() {
 		log.Fatal("❌ No assets fetched successfully!")
 	}
 	
-	fmt.Printf("\n🔗 Combined %d assets from all sources\n", len(allAssets))
+	// Separate stocks from commodities
+	var stocks []AssetData
+	var commodities []AssetData
 	
+	for _, asset := range allAssets {
+		if asset.AssetType == "commodity" {
+			commodities = append(commodities, asset)
+		} else {
+			stocks = append(stocks, asset)
+		}
+	}
+	
+	fmt.Printf("\n📊 Received %d stocks and %d commodities\n", len(stocks), len(commodities))
+	
+	// Sort stocks by market cap and take top 500
+	sort.Slice(stocks, func(i, j int) bool {
+		return stocks[i].MarketCap > stocks[j].MarketCap
+	})
+	
+	if len(stocks) > 500 {
+		stocks = stocks[:500]
+		fmt.Printf("✂️  Limited to top 500 stocks by market cap\n")
+	}
+	
+	// Combine top 500 stocks with commodities
+	allAssets = append(stocks, commodities...)
+	
+	fmt.Printf("🔗 Final dataset: %d stocks + %d commodities = %d total assets\n", 
+		len(stocks), len(commodities), len(allAssets))
+	
+	// Final sort by market cap
 	sort.Slice(allAssets, func(i, j int) bool {
 		return allAssets[i].MarketCap > allAssets[j].MarketCap
 	})
