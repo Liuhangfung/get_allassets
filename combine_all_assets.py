@@ -359,8 +359,8 @@ class AssetCombiner:
                         # Use regular insert when database was cleared
                         result = self.supabase.table('assets').insert(batch).execute()
                     else:
-                        # Use upsert without on_conflict parameter (works without unique constraint)
-                        result = self.supabase.table('assets').upsert(batch).execute()
+                        # Use upsert with the correct constraint name from the database
+                        result = self.supabase.table('assets').upsert(batch, on_conflict='symbol,snapshot_date').execute()
                     
                     if result.data:
                         total_processed += len(batch)
@@ -375,7 +375,7 @@ class AssetCombiner:
                             if clear_existing:
                                 individual_result = self.supabase.table('assets').insert([individual_asset]).execute()
                             else:
-                                individual_result = self.supabase.table('assets').upsert([individual_asset]).execute()
+                                individual_result = self.supabase.table('assets').upsert([individual_asset], on_conflict='symbol,snapshot_date').execute()
                             if individual_result.data:
                                 successful += 1
                         except Exception as individual_error:
