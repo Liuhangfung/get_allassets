@@ -1,0 +1,90 @@
+//@version=5
+indicator(title="MACD Strategy with JSON Alerts", shorttitle="MACD JSON Strategy", overlay=false)
+
+// --- Parameters ---
+// MACD settings are hardcoded.
+fast_length = 12
+slow_length = 26
+signal_length = 9
+src = close
+
+// --- MACD Calculation ---
+fast_ema = ta.ema(src, fast_length)
+slow_ema = ta.ema(src, slow_length)
+macd_line = fast_ema - slow_ema
+signal_line = ta.sma(macd_line, signal_length)
+histogram = macd_line - signal_line
+
+// --- Event Detection ---
+crossUp = ta.crossover(macd_line, signal_line)
+crossDown = ta.crossunder(macd_line, signal_line)
+
+// Function to convert ticker to BASE/QUOTE format
+format_symbol() =>
+    ticker = syminfo.ticker
+    // Handle common quote currencies
+    if str.endswith(ticker, "USDT")
+        str.replace(ticker, "USDT", "/USDT")
+    else if str.endswith(ticker, "USDC")
+        str.replace(ticker, "USDC", "/USDC")
+    else if str.endswith(ticker, "USD")
+        str.replace(ticker, "USD", "/USD")
+    else if str.endswith(ticker, "BTC")
+        str.replace(ticker, "BTC", "/BTC")
+    else if str.endswith(ticker, "ETH")
+        str.replace(ticker, "ETH", "/ETH")
+    else if str.endswith(ticker, "EUR")
+        str.replace(ticker, "EUR", "/EUR")
+    else if str.endswith(ticker, "GBP")
+        str.replace(ticker, "GBP", "/GBP")
+    else
+        ticker
+
+// Function to format timestamp to ISO format
+format_timestamp() =>
+    year_str = str.tostring(year)
+    month_str = month < 10 ? "0" + str.tostring(month) : str.tostring(month)
+    day_str = dayofmonth < 10 ? "0" + str.tostring(dayofmonth) : str.tostring(dayofmonth)
+    hour_str = hour < 10 ? "0" + str.tostring(hour) : str.tostring(hour)
+    minute_str = minute < 10 ? "0" + str.tostring(minute) : str.tostring(minute)
+    second_str = second < 10 ? "0" + str.tostring(second) : str.tostring(second)
+    
+    year_str + "-" + month_str + "-" + day_str + "T" + hour_str + ":" + minute_str + ":" + second_str + "Z"
+
+// --- Signal Detection ---
+// Signals are now handled through alerts only (no actual trading)
+
+// Trigger Function for Alerts and Labels
+trigger_alerts() =>
+    string price_str = str.tostring(close)
+    string sym = "\"" + format_symbol() + "\""
+    string time_str = "\"" + format_timestamp() + "\""
+
+    // Buy Alert (MACD crosses above the signal line)
+    if crossUp
+        string buy_msg = '{"symbol": ' + sym + ', "side": "buy", "price": "' + price_str + '", "quantity": "0", "time": ' + time_str + ', "orderType": "market"}'
+        alert(buy_msg, alert.freq_once_per_bar_close)
+
+    // Sell Alert (MACD crosses below the signal line)
+    if crossDown
+        string sell_msg = '{"symbol": ' + sym + ', "side": "sell", "price": "' + price_str + '", "quantity": "0", "time": ' + time_str + ', "orderType": "market"}'
+        alert(sell_msg, alert.freq_once_per_bar_close)
+
+// Call the Trigger Function on each bar
+trigger_alerts()
+
+// --- Chart Plotting ---
+// Plot MACD and signal lines for visual analysis.
+plot(macd_line, color=color.new(color.blue, 0), title="MACD Line")
+plot(signal_line, color=color.new(color.orange, 0), title="Signal Line")
+plot(histogram, style=plot.style_histogram, color=histogram >= 0 ? color.new(color.green, 50) : color.new(color.red, 50), title="Histogram")
+
+// Plot visual buy/sell labels on the chart.
+if (crossUp)
+    label.new(bar_index, macd_line, "🚀 BUY\n$" + str.tostring(close, "#.##"), color=color.green, style=label.style_label_up, textcolor=color.white, tooltip="Buy Signal at $" + str.tostring(close, "#.##"))
+
+if (crossDown)
+    label.new(bar_index, macd_line, "📉 SELL\n$" + str.tostring(close, "#.##"), color=color.red, style=label.style_label_down, textcolor=color.white, tooltip="Sell Signal at $" + str.tostring(close, "#.##"))
+
+// --- Alert Conditions Removed ---
+// Using only dynamic alert() function for proper BASE/QUOTE formatting
