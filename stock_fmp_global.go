@@ -15,45 +15,52 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// New structure for batch market cap response
+type FMPBatchMarketCap struct {
+	Symbol    string  `json:"symbol"`
+	Date      string  `json:"date"`
+	MarketCap float64 `json:"marketCap"`
+}
+
 // FMP API structures
 type FMPStockScreener struct {
-	Symbol             string  `json:"symbol"`
-	CompanyName        string  `json:"companyName"`
-	MarketCap          float64 `json:"marketCap"`
-	Sector             string  `json:"sector"`
-	Industry           string  `json:"industry"`
-	Beta               float64 `json:"beta"`
-	Price              float64 `json:"price"`
-	Volume             float64 `json:"volume"`
-	Exchange           string  `json:"exchange"`
-	ExchangeShortName  string  `json:"exchangeShortName"`
-	Country            string  `json:"country"`
-	IsEtf              bool    `json:"isEtf"`
-	IsActivelyTrading  bool    `json:"isActivelyTrading"`
+	Symbol            string  `json:"symbol"`
+	CompanyName       string  `json:"companyName"`
+	MarketCap         float64 `json:"marketCap"`
+	Sector            string  `json:"sector"`
+	Industry          string  `json:"industry"`
+	Beta              float64 `json:"beta"`
+	Price             float64 `json:"price"`
+	Volume            float64 `json:"volume"`
+	Exchange          string  `json:"exchange"`
+	ExchangeShortName string  `json:"exchangeShortName"`
+	Country           string  `json:"country"`
+	IsEtf             bool    `json:"isEtf"`
+	IsActivelyTrading bool    `json:"isActivelyTrading"`
 }
 
 type FMPQuote struct {
-	Symbol             string  `json:"symbol"`
-	Name               string  `json:"name"`
-	Price              float64 `json:"price"`
-	ChangesPercentage  float64 `json:"changesPercentage"`
-	Change             float64 `json:"change"`
-	MarketCap          float64 `json:"marketCap"`
-	Volume             float64 `json:"volume"`
-	Open               float64 `json:"open"`
-	PreviousClose      float64 `json:"previousClose"`
-	Exchange           string  `json:"exchange"`
-	SharesOutstanding  float64 `json:"sharesOutstanding"`
+	Symbol            string  `json:"symbol"`
+	Name              string  `json:"name"`
+	Price             float64 `json:"price"`
+	ChangesPercentage float64 `json:"changesPercentage"`
+	Change            float64 `json:"change"`
+	MarketCap         float64 `json:"marketCap"`
+	Volume            float64 `json:"volume"`
+	Open              float64 `json:"open"`
+	PreviousClose     float64 `json:"previousClose"`
+	Exchange          string  `json:"exchange"`
+	SharesOutstanding float64 `json:"sharesOutstanding"`
 }
 
 type FMPCommodity struct {
-	Symbol             string  `json:"symbol"`
-	Name               string  `json:"name"`
-	Price              float64 `json:"price"`
-	ChangesPercentage  float64 `json:"changesPercentage"`
-	Change             float64 `json:"change"`
-	PreviousClose      float64 `json:"previousClose"`
-	Exchange           string  `json:"exchange"`
+	Symbol            string  `json:"symbol"`
+	Name              string  `json:"name"`
+	Price             float64 `json:"price"`
+	ChangesPercentage float64 `json:"changesPercentage"`
+	Change            float64 `json:"change"`
+	PreviousClose     float64 `json:"previousClose"`
+	Exchange          string  `json:"exchange"`
 }
 
 type FMPCompanyProfile struct {
@@ -73,19 +80,19 @@ type FMPCompanyProfile struct {
 }
 
 type AssetData struct {
-	Ticker            string  `json:"ticker"`
-	Name              string  `json:"name"`
-	MarketCap         float64 `json:"market_cap"`
-	CurrentPrice      float64 `json:"current_price"`
-	PreviousClose     float64 `json:"previous_close"`
-	PercentageChange  float64 `json:"percentage_change"`
-	Volume            float64 `json:"volume"`
-	PrimaryExchange   string  `json:"primary_exchange"`
-	Country           string  `json:"country"`
-	Sector            string  `json:"sector"`
-	Industry          string  `json:"industry"`
-	AssetType         string  `json:"asset_type"`
-	Image             string  `json:"image"`
+	Ticker           string  `json:"ticker"`
+	Name             string  `json:"name"`
+	MarketCap        float64 `json:"market_cap"`
+	CurrentPrice     float64 `json:"current_price"`
+	PreviousClose    float64 `json:"previous_close"`
+	PercentageChange float64 `json:"percentage_change"`
+	Volume           float64 `json:"volume"`
+	PrimaryExchange  string  `json:"primary_exchange"`
+	Country          string  `json:"country"`
+	Sector           string  `json:"sector"`
+	Industry         string  `json:"industry"`
+	AssetType        string  `json:"asset_type"`
+	Image            string  `json:"image"`
 }
 
 type FMPClient struct {
@@ -110,8 +117,19 @@ func (c *FMPClient) makeRequest(endpoint string) ([]byte, error) {
 		separator = "&"
 	}
 	url := fmt.Sprintf("%s%s%sapikey=%s", c.BaseURL, endpoint, separator, c.APIKey)
-	
-	resp, err := c.HTTPClient.Get(url)
+
+	// Create request with proper headers for UTF-8 encoding
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers to properly handle UTF-8 content
+	req.Header.Set("Accept", "application/json; charset=utf-8")
+	req.Header.Set("Accept-Charset", "utf-8")
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
@@ -132,7 +150,7 @@ func (c *FMPClient) makeRequest(endpoint string) ([]byte, error) {
 
 func (c *FMPClient) GetQuote(symbol string) (*FMPQuote, error) {
 	endpoint := fmt.Sprintf("/v3/quote/%s", symbol)
-	
+
 	body, err := c.makeRequest(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quote for %s: %w", symbol, err)
@@ -152,7 +170,7 @@ func (c *FMPClient) GetQuote(symbol string) (*FMPQuote, error) {
 
 func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error) {
 	endpoint := fmt.Sprintf("/v3/profile/%s", symbol)
-	
+
 	body, err := c.makeRequest(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get company profile for %s: %w", symbol, err)
@@ -170,12 +188,496 @@ func (c *FMPClient) GetCompanyProfile(symbol string) (*FMPCompanyProfile, error)
 	return &profiles[0], nil
 }
 
+// New function to get major global stocks using batch endpoint
+func (c *FMPClient) GetMajorGlobalStocks() ([]AssetData, error) {
+	fmt.Println("🌍 Fetching major global stocks using batch endpoint...")
+
+	// EXPANDED GLOBAL STOCK LIST - targeting 800+ symbols to get top 500 by market cap
+	globalStocks := []string{
+		// USA - S&P 500 Major Companies (150+ symbols)
+		"AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "AVGO", "ORCL",
+		"WMT", "LLY", "V", "JPM", "TSM", "UNH", "XOM", "MA", "PG", "JNJ", "HD", "NFLX",
+		"BAC", "ABBV", "CRM", "KO", "COST", "PEP", "TMO", "MRK", "ADBE", "CSCO", "ACN",
+		"TMUS", "ABT", "DIS", "WFC", "AMD", "VZ", "CMCSA", "DHR", "INTU", "TXN", "QCOM",
+		"PM", "UNP", "IBM", "SPGI", "GS", "HON", "NKE", "AXP", "BLK", "MS", "SYK", "UBER",
+		"NOW", "BKNG", "AMAT", "ISRG", "CATV", "GILD", "MDLZ", "LRCX", "ADP", "VRTX",
+		"REGN", "KLAC", "PANW", "PYPL", "CDNS", "SNPS", "CRWD", "MRVL", "ORLY", "CTAS",
+		"ADSK", "FTNT", "CHTR", "NXPI", "ABNB", "WDAY", "DDOG", "TEAM", "SNOW", "ZS",
+		"OKTA", "SPLK", "VEEV", "DOCU", "ZM", "PTON", "ROKU", "TWLO", "SHOP", "SQ",
+		"COIN", "RBLX", "PLTR", "HOOD", "RIVN", "LCID", "GRAB", "DIDI", "BNTX", "MRNA",
+		"LULU", "SBUX", "CMG", "CTSH", "ANET", "DXCM", "ILMN", "BIIB", "SGEN", "ALGN",
+		"IDXX", "FAST", "ODFL", "VRSK", "ANSS", "CDNS", "MCHP", "PAYX", "CSGP", "LOGI",
+
+		// Hong Kong - Major listings (40+ symbols)
+		"700.HK", "9988.HK", "3690.HK", "2318.HK", "1299.HK", "939.HK", "1398.HK", "2388.HK",
+		"1113.HK", "2628.HK", "1810.HK", "9618.HK", "9888.HK", "3988.HK", "2020.HK", "1093.HK",
+		"2382.HK", "2319.HK", "1177.HK", "1928.HK", "1972.HK", "6098.HK", "1024.HK", "9999.HK",
+		"1109.HK", "2007.HK", "1211.HK", "2269.HK", "1833.HK", "1336.HK", "2313.HK", "1658.HK",
+		"1766.HK", "1919.HK", "1193.HK", "1888.HK", "6060.HK", "1801.HK", "1088.HK", "1361.HK",
+
+		// China - Major A-shares and ADRs (30+ symbols)
+		"BABA", "PDD", "JD", "BIDU", "NTES", "TME", "BILI", "NIO", "XPEV", "LI",
+		"TCEHY", "WB", "VIPS", "YMM", "BZUN", "DOYU", "HUYA", "IQ", "MOMO", "QTT",
+		"TIGR", "TUYA", "CBPO", "FINV", "GOTU", "LABU", "MOXC", "PAGS", "STNE", "YALA",
+
+		// France - CAC 40 + Major Companies (50+ symbols)
+		"MC.PA", "OR.PA", "RMS.PA", "TTE.PA", "SAN.PA", "BNP.PA", "AIR.PA", "CAP.PA",
+		"BN.PA", "CS.PA", "ML.PA", "EL.PA", "VIV.PA", "KER.PA", "LR.PA", "ATO.PA",
+		"BNP.PA", "CA.PA", "GLE.PA", "SU.PA", "UG.PA", "DSY.PA", "DG.PA", "RNO.PA",
+		"SGO.PA", "STM.PA", "SW.PA", "TEP.PA", "URW.PA", "VK.PA", "WLN.PA", "EN.PA",
+		"ACA.PA", "ADP.PA", "AI.PA", "AIR.PA", "ALO.PA", "BIM.PA", "BOL.PA", "CDI.PA",
+		"CNA.PA", "COV.PA", "DIM.PA", "EI.PA", "ERF.PA", "FDJ.PA", "FP.PA", "FTI.PA",
+
+		// Germany - DAX + Major Companies (50+ symbols)
+		"SAP", "ASML", "LVMH", "RMS", "TTE", "SAN", "BNP", "AIR", "CAP", "BN",
+		"ALV.DE", "BAS.DE", "BAYN.DE", "BMW.DE", "CON.DE", "DAI.DE", "DBK.DE", "DB1.DE",
+		"DTE.DE", "EOAN.DE", "FME.DE", "FRE.DE", "HEI.DE", "HEN3.DE", "IFX.DE", "LIN.DE",
+		"MRK.DE", "MUV2.DE", "RWE.DE", "SAP.DE", "SIE.DE", "VOW3.DE", "WDI.DE", "ZAL.DE",
+		"ADS.DE", "DHER.DE", "MTX.DE", "PUM.DE", "QIA.DE", "SHL.DE", "SY1.DE", "TEG.DE",
+		"VNA.DE", "1COV.DE", "AFX.DE", "AIXA.DE", "BC8.DE", "BEI.DE", "BNR.DE", "CWK.DE",
+
+		// UK - FTSE 100 + Major Companies (60+ symbols)
+		"AZN", "LSEG", "UL", "RELX", "GSK", "RIO", "BP", "HSBA.L", "VOD.L",
+		"BT.L", "LLOY.L", "BARC.L", "GLEN.L", "BHP.L", "RBS.L", "ULVR.L", "SHEL.L",
+		"AAL.L", "ADM.L", "AHT.L", "ANTO.L", "AUTO.L", "AVV.L", "AZN.L", "BA.L",
+		"BATS.L", "BLND.L", "BNZL.L", "BRB.L", "BREE.L", "BT.A.L", "CCL.L", "CNA.L",
+		"CPG.L", "CRDA.L", "DCC.L", "DGE.L", "EXPN.L", "FERG.L", "FLTR.L", "FRAS.L",
+		"GLEN.L", "GSK.L", "HALM.L", "HLN.L", "HWDN.L", "ICG.L", "IHG.L", "IMB.L",
+		"INF.L", "ITRK.L", "JD.L", "JET.L", "KGF.L", "LAND.L", "LGEN.L", "MNDI.L",
+
+		// Switzerland - Major stocks (30+ symbols)
+		"NESN.SW", "RHHBY", "NOVN.SW", "ROG.SW", "UHR.SW", "GIVN.SW", "LONN.SW",
+		"UBSG.SW", "CSGN.SW", "SREN.SW", "ABBN.SW", "SLHN.SW", "ZURN.SW", "GEBN.SW",
+		"CFR.SW", "SCMN.SW", "BAER.SW", "TEMN.SW", "STMN.SW", "PGHN.SW", "BUCN.SW",
+		"DKSH.SW", "GALE.SW", "HELN.SW", "HOLN.SW", "KNIN.SW", "LHGN.SW", "LISN.SW",
+		"METD.SW", "METN.SW", "MOBN.SW", "OREA.SW", "PARG.SW", "PSPN.SW", "SGSN.SW",
+
+		// Saudi Arabia - TADAWUL Major stocks (30+ symbols)
+		"2222.SR", "2030.SR", "1120.SR", "2380.SR", "1150.SR", "7020.SR", "1180.SR",
+		"4030.SR", "2010.SR", "2020.SR", "1210.SR", "2290.SR", "1320.SR", "2350.SR",
+		"1050.SR", "2040.SR", "2080.SR", "2090.SR", "2170.SR", "2220.SR", "2230.SR",
+		"2250.SR", "2260.SR", "2270.SR", "2280.SR", "2300.SR", "2310.SR", "2320.SR",
+		"2330.SR", "2340.SR", "2360.SR", "2370.SR", "4001.SR", "4002.SR", "4003.SR",
+
+		// Japan - Nikkei 225 Major stocks (60+ symbols)
+		"7203.T", "6098.T", "6861.T", "8306.T", "9984.T", "4063.T", "6758.T", "6981.T",
+		"9432.T", "8035.T", "4568.T", "6594.T", "4751.T", "6902.T", "7974.T", "6762.T",
+		"4502.T", "4503.T", "4519.T", "4523.T", "4578.T", "4689.T", "4901.T", "4911.T",
+		"4967.T", "5019.T", "5020.T", "5101.T", "5108.T", "5201.T", "5202.T", "5233.T",
+		"5401.T", "5411.T", "5541.T", "5631.T", "5703.T", "5711.T", "5713.T", "5714.T",
+		"5801.T", "5802.T", "5803.T", "5901.T", "5947.T", "5949.T", "6103.T", "6113.T",
+		"6178.T", "6273.T", "6301.T", "6326.T", "6361.T", "6367.T", "6473.T", "6501.T",
+
+		// Australia - ASX 200 Major stocks (40+ symbols)
+		"BHP.AX", "CBA.AX", "CSL.AX", "WBC.AX", "ANZ.AX", "NAB.AX", "WES.AX", "TLS.AX",
+		"RIO.AX", "TCL.AX", "WDS.AX", "FMG.AX", "STO.AX", "WOW.AX", "MQG.AX", "NCM.AX",
+		"APT.AX", "APX.AX", "ASX.AX", "BXB.AX", "CAR.AX", "COL.AX", "CPU.AX", "CWN.AX",
+		"DXS.AX", "GMG.AX", "GOZ.AX", "GPT.AX", "IAG.AX", "IEL.AX", "JHX.AX", "LYC.AX",
+		"MGR.AX", "MIN.AX", "NST.AX", "NXT.AX", "ORA.AX", "ORG.AX", "PDN.AX", "PLS.AX",
+
+		// Canada - TSX Major stocks (40+ symbols)
+		"RY.TO", "TD.TO", "ENB.TO", "CNR.TO", "BNS.TO", "BAM.TO", "CSU.TO", "TRI.TO",
+		"BMO.TO", "CM.TO", "CNQ.TO", "L.TO", "ATD.TO", "SU.TO", "WCN.TO", "MFC.TO",
+		"ABX.TO", "AEM.TO", "AQN.TO", "AW.UN.TO", "CCO.TO", "CP.TO", "CVE.TO", "DOL.TO",
+		"EMA.TO", "ENS.TO", "FFH.TO", "FTS.TO", "GIB.A.TO", "GWO.TO", "H.TO", "IFC.TO",
+		"IMO.TO", "K.TO", "KL.TO", "MG.TO", "NA.TO", "NTR.TO", "OTEX.TO", "POW.TO",
+
+		// Netherlands - AEX Major stocks (30+ symbols)
+		"ASML", "RDSA", "UNA", "PHIA", "INGA", "HEIA", "MT", "ADYEN", "DSM", "ABN",
+		"AKZA.AS", "ASML.AS", "BESI.AS", "DSM.AS", "GLPG.AS", "HEIA.AS", "INGA.AS",
+		"KPN.AS", "NN.AS", "PHIA.AS", "PROSUS.AS", "RDSA.AS", "SBMO.AS", "TKWY.AS",
+		"UNA.AS", "WKL.AS", "AALB.AS", "ABN.AS", "AD.AS", "AGN.AS", "ALFEN.AS", "APAM.AS",
+
+		// Brazil - Bovespa Major stocks (25+ symbols)
+		"VALE", "PETR4.SA", "ITUB4.SA", "BBDC4.SA", "ABEV3.SA", "MGLU3.SA", "WEGE3.SA",
+		"B3SA3.SA", "RENT3.SA", "LREN3.SA", "SUZB3.SA", "RAIL3.SA", "VVAR3.SA", "RADL3.SA",
+		"HAPV3.SA", "EQTL3.SA", "NTCO3.SA", "CSAN3.SA", "CSNA3.SA", "USIM5.SA", "GOAU4.SA",
+		"TIMS3.SA", "KLBN11.SA", "SUZB5.SA", "EMBR3.SA", "CCRO3.SA", "GGBR4.SA", "BEEF3.SA",
+
+		// South Korea - KOSPI Major stocks (25+ symbols)
+		"005930.KS", "000660.KS", "035420.KS", "005380.KS", "035720.KS", "051910.KS",
+		"006400.KS", "028260.KS", "055550.KS", "105560.KS", "096770.KS", "003670.KS",
+		"017670.KS", "030200.KS", "036570.KS", "034020.KS", "018260.KS", "015760.KS",
+		"009150.KS", "010950.KS", "011070.KS", "012330.KS", "016360.KS", "021240.KS",
+		"024110.KS", "029780.KS", "032640.KS", "047050.KS", "051900.KS", "078930.KS",
+
+		// Taiwan - TWSE Major stocks (25+ symbols)
+		"2330.TW", "2317.TW", "2454.TW", "2412.TW", "1303.TW", "2308.TW", "1216.TW",
+		"2002.TW", "1301.TW", "2881.TW", "2882.TW", "2891.TW", "2892.TW", "2912.TW",
+		"3008.TW", "3034.TW", "3045.TW", "3711.TW", "4904.TW", "4938.TW", "5871.TW",
+		"5880.TW", "6505.TW", "6770.TW", "8454.TW", "9904.TW", "9910.TW", "9921.TW",
+
+		// Spain - IBEX 35 Major stocks (25+ symbols)
+		"SAN", "IBE", "TEF", "BBVA", "ITX", "REP", "ENG", "AMS", "CABK", "FER",
+		"AENA.MC", "ACS.MC", "CLNX.MC", "COL.MC", "ELE.MC", "ENC.MC", "FDR.MC", "GRF.MC",
+		"IAG.MC", "IDR.MC", "LOG.MC", "MAP.MC", "MAS.MC", "MEL.MC", "MTS.MC", "MRL.MC",
+		"REE.MC", "ROVI.MC", "SCYR.MC", "SLR.MC", "TL5.MC", "TRE.MC", "UNI.MC", "VIS.MC",
+
+		// Italy - FTSE MIB Major stocks (25+ symbols)
+		"ENEL.MI", "ENI.MI", "ISP.MI", "UCG.MI", "TIT.MI", "STM.MI", "RACE.MI",
+		"AZM.MI", "BAMI.MI", "BMED.MI", "BPSO.MI", "BSRP.MI", "BUZZ.MI", "CNH.MI",
+		"CPR.MI", "DIA.MI", "EXO.MI", "FCA.MI", "G.MI", "HER.MI", "IG.MI", "INW.MI",
+		"IP.MI", "LDO.MI", "MB.MI", "MONC.MI", "PIRC.MI", "PRY.MI", "PST.MI", "REC.MI",
+
+		// Mexico - BMV Major stocks (20+ symbols)
+		"WALMEX.MX", "FEMSA.MX", "GMEXICO.MX", "TLEVISA.MX", "BIMBO.MX", "AMX.MX",
+		"ALFA.MX", "ALSEA.MX", "ASUR.MX", "CEMEX.MX", "ELEKTRA.MX", "GFNORTE.MX",
+		"GRUMA.MX", "KIMBER.MX", "LALA.MX", "LIVEPOLC.MX", "MEGACPO.MX", "NEMAK.MX",
+		"ORBIA.MX", "PINFRA.MX", "SITESB.MX", "VOLARIS.MX", "WALMEX.MX", "AC.MX",
+
+		// South Africa - JSE Major stocks (20+ symbols)
+		"NPN.JO", "PRX.JO", "DSY.JO", "SHP.JO", "BHP.JO", "SOL.JO", "MTN.JO",
+		"ABG.JO", "AGL.JO", "AMS.JO", "ANG.JO", "APN.JO", "BAW.JO", "BID.JO",
+		"BIL.JO", "BVT.JO", "CFR.JO", "CLS.JO", "CPI.JO", "DSY.JO", "EXX.JO",
+		"FSR.JO", "GFI.JO", "GRT.JO", "HAR.JO", "IMP.JO", "INL.JO", "INP.JO",
+
+		// Nordic countries - Major stocks (20+ symbols)
+		"NOVO-B.CO", "ASML.AS", "RDSA.AS", "UNA.AS", "PHIA.AS", "INGA.AS", "HEIA.AS",
+		"VOLV-B.ST", "ERIC-B.ST", "SEB-A.ST", "SWED-A.ST", "TEL2-B.ST", "TELIA.ST",
+		"INVESTOR-B.ST", "ATCO-A.ST", "ATCO-B.ST", "KINV-B.ST", "LUNDBERGB.ST",
+		"SAND.ST", "SSAB-A.ST", "SSAB-B.ST", "SKF-B.ST", "SECU-B.ST", "SINCH.ST",
+
+		// Additional major ADRs and cross-listings (30+ symbols)
+		"TSM", "ASML", "SAP", "TM", "SONY", "NVO", "UL", "DEO", "BCS", "ING",
+		"DB", "NVS", "RHHBY", "SNY", "AZN", "GSK", "BP", "RIO", "BHP",
+		"WBK", "LYG", "MUFG", "SMFG", "NMR", "E", "CEO", "CX", "BBD", "SID",
+		"ITUB", "BBD", "PBR", "VALE", "ABEV", "TIMB", "STNE", "PAGS", "NU", "MELI",
+	}
+
+	// Remove duplicates
+	seen := make(map[string]bool)
+	uniqueStocks := []string{}
+	for _, symbol := range globalStocks {
+		if !seen[symbol] {
+			seen[symbol] = true
+			uniqueStocks = append(uniqueStocks, symbol)
+		}
+	}
+
+	fmt.Printf("📊 Preparing to fetch %d unique global stocks...\n", len(uniqueStocks))
+
+	// Process in batches of 75 (optimized for parallel processing)
+	batchSize := 75
+
+	// Pre-calculate exchange rates to avoid repeated API calls
+	exchangeRateCache := make(map[string]float64)
+	var rateMutex sync.RWMutex
+	var allAssets []AssetData
+	var totalRequested int
+	var totalReceived int
+	var totalProcessed int
+	var skippedInvalidMarketCap int
+	var skippedQuoteFailed int
+
+	// Use mutex for thread-safe operations
+	var mu sync.Mutex
+
+	for i := 0; i < len(uniqueStocks); i += batchSize {
+		end := i + batchSize
+		if end > len(uniqueStocks) {
+			end = len(uniqueStocks)
+		}
+
+		batch := uniqueStocks[i:end]
+		symbols := strings.Join(batch, ",")
+		totalRequested += len(batch)
+
+		fmt.Printf("🔄 Processing batch %d/%d (%d symbols)...\n",
+			(i/batchSize)+1, (len(uniqueStocks)+batchSize-1)/batchSize, len(batch))
+
+		// Use the batch market cap endpoint (different base URL)
+		url := fmt.Sprintf("https://financialmodelingprep.com/stable/market-capitalization-batch?symbols=%s&apikey=%s", symbols, c.APIKey)
+
+		// Create request with proper headers for UTF-8 encoding
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to create batch request %d: %v\n", (i/batchSize)+1, err)
+			continue
+		}
+
+		// Set headers to properly handle UTF-8 content
+		req.Header.Set("Accept", "application/json; charset=utf-8")
+		req.Header.Set("Accept-Charset", "utf-8")
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to fetch batch %d: %v\n", (i/batchSize)+1, err)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if err != nil {
+			fmt.Printf("⚠️  Failed to read batch %d response: %v\n", (i/batchSize)+1, err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Printf("⚠️  Batch %d API error (status %d): %s\n", (i/batchSize)+1, resp.StatusCode, string(body))
+			continue
+		}
+
+		var batchData []FMPBatchMarketCap
+		if err := json.Unmarshal(body, &batchData); err != nil {
+			fmt.Printf("⚠️  Failed to parse batch %d data: %v\n", (i/batchSize)+1, err)
+			continue
+		}
+
+		fmt.Printf("✅ Batch %d: Received %d stocks\n", (i/batchSize)+1, len(batchData))
+		totalReceived += len(batchData)
+
+		// Process each stock in the batch in parallel
+		var batchWg sync.WaitGroup
+		var batchMu sync.Mutex
+		var batchAssets []AssetData
+
+		// Use semaphore to limit concurrent API calls per batch
+		quoteSemaphore := make(chan struct{}, 10) // Max 10 concurrent quotes per batch
+
+		for _, stock := range batchData {
+			if stock.MarketCap <= 0 {
+				skippedInvalidMarketCap++
+				continue // Skip invalid market caps
+			}
+
+			// Process each stock in parallel
+			batchWg.Add(1)
+			go func(stock FMPBatchMarketCap) {
+				defer batchWg.Done()
+
+				// Acquire semaphore to limit concurrent API calls
+				quoteSemaphore <- struct{}{}
+				defer func() { <-quoteSemaphore }()
+
+				// Debug: Log original batch data for major stocks
+				if stock.MarketCap > 100e9 { // Log stocks > $100B for debugging
+					fmt.Printf("🔍 DEBUG Batch Data - %s: Market Cap = %.2fB (from batch endpoint)\n",
+						stock.Symbol, stock.MarketCap/1e9)
+				}
+
+				// Get real-time quote for additional data
+				quote, err := c.GetQuote(stock.Symbol)
+				if err != nil {
+					// Skip if quote fails but log it
+					fmt.Printf("⚠️  Failed to get quote for %s: %v\n", stock.Symbol, err)
+					mu.Lock()
+					skippedQuoteFailed++
+					mu.Unlock()
+					return
+				}
+
+				// Debug: Log quote data for comparison
+				if stock.MarketCap > 100e9 {
+					fmt.Printf("🔍 DEBUG Quote Data - %s: Market Cap = %.2fB (from quote endpoint)\n",
+						stock.Symbol, quote.MarketCap/1e9)
+				}
+
+				// Get company profile for additional details (only for larger companies to save API calls)
+				var profile *FMPCompanyProfile
+				if stock.MarketCap > 10e9 { // Only fetch profiles for companies > $10B
+					profile, err = c.GetCompanyProfile(stock.Symbol)
+					if err != nil {
+						// Use default values if profile fails
+						profile = &FMPCompanyProfile{
+							Symbol:      stock.Symbol,
+							CompanyName: quote.Name,
+							Country:     "Unknown",
+							Sector:      "Unknown",
+							Industry:    "Unknown",
+							Image:       "",
+						}
+					}
+				} else {
+					// Use default values for smaller companies to save API calls
+					profile = &FMPCompanyProfile{
+						Symbol:      stock.Symbol,
+						CompanyName: quote.Name,
+						Country:     "Unknown",
+						Sector:      "Unknown",
+						Industry:    "Unknown",
+						Image:       "",
+					}
+				}
+
+				// Detect currency and country
+				currencyCode := c.detectCurrency(stock.Symbol, profile.Country)
+
+				// Keep prices in original currency, but determine best market cap source
+				currentPrice := quote.Price
+				previousClose := quote.PreviousClose
+
+				// Choose more reliable market cap source
+				var sourceMarketCap float64
+				var marketCapSource string
+
+				// For non-USD stocks, prefer quote endpoint if significantly different from batch
+				if currencyCode != "USD" && quote.MarketCap > 0 {
+					// Compare batch vs quote market caps
+					batchCap := stock.MarketCap
+					quoteCap := quote.MarketCap
+
+					// If quote cap is much larger than batch cap, quote might already be in USD
+					ratio := quoteCap / batchCap
+					if ratio > 10 && quoteCap > 100e9 { // Quote is >10x larger and >$100B
+						sourceMarketCap = quoteCap
+						marketCapSource = "quote (likely USD)"
+						fmt.Printf("🔄 Using quote endpoint for %s: batch=%.1fB vs quote=%.1fB (ratio=%.1fx)\n",
+							stock.Symbol, batchCap/1e9, quoteCap/1e9, ratio)
+					} else {
+						sourceMarketCap = batchCap
+						marketCapSource = "batch (local currency)"
+					}
+				} else {
+					sourceMarketCap = stock.MarketCap
+					marketCapSource = "batch"
+				}
+
+				marketCapUSD := sourceMarketCap
+				originalMarketCap := sourceMarketCap
+
+				// Convert market cap to USD if needed and source is in local currency
+				if currencyCode != "USD" && marketCapSource != "quote (likely USD)" {
+					// Use cached exchange rate if available
+					rateMutex.RLock()
+					exchangeRate, exists := exchangeRateCache[currencyCode]
+					rateMutex.RUnlock()
+
+					if !exists {
+						// Fetch and cache the exchange rate
+						exchangeRate = c.getUSDExchangeRate(currencyCode)
+						rateMutex.Lock()
+						exchangeRateCache[currencyCode] = exchangeRate
+						rateMutex.Unlock()
+					}
+
+					marketCapUSD = sourceMarketCap * exchangeRate
+
+					// Log ALL currency conversions for debugging
+					fmt.Printf("💱 Converting %s (%s): %.1fB %s × %.6f = $%.1fB USD [source: %s]\n",
+						stock.Symbol, profile.CompanyName, originalMarketCap/1e9, currencyCode, exchangeRate, marketCapUSD/1e9, marketCapSource)
+				} else {
+					// Log USD/already converted stocks
+					if sourceMarketCap > 50e9 { // Only log major stocks
+						fmt.Printf("💵 %s (%s): $%.1fB USD [source: %s, no conversion needed]\n",
+							stock.Symbol, profile.CompanyName, marketCapUSD/1e9, marketCapSource)
+					}
+				}
+
+				// Determine country from symbol if not in profile
+				country := profile.Country
+				if country == "Unknown" || country == "" {
+					country = c.detectCountryFromSymbol(stock.Symbol)
+				}
+
+				asset := AssetData{
+					Ticker:           stock.Symbol,
+					Name:             profile.CompanyName,
+					MarketCap:        marketCapUSD,  // Already in USD from batch endpoint
+					CurrentPrice:     currentPrice,  // Keep in original currency
+					PreviousClose:    previousClose, // Keep in original currency
+					PercentageChange: quote.ChangesPercentage,
+					Volume:           quote.Volume,
+					PrimaryExchange:  quote.Exchange,
+					Country:          country,
+					Sector:           profile.Sector,
+					Industry:         profile.Industry,
+					AssetType:        "stock",
+					Image:            profile.Image,
+				}
+
+				// Add to batch results with mutex protection
+				batchMu.Lock()
+				batchAssets = append(batchAssets, asset)
+				batchMu.Unlock()
+
+				// Log major additions
+				if marketCapUSD > 50e9 { // Log stocks > $50B
+					fmt.Printf("🌍 Added: %s (%s) - %s | Market Cap: $%.1fB USD | Country: %s\n",
+						stock.Symbol, profile.CompanyName, currencyCode, marketCapUSD/1e9, country)
+				}
+			}(stock)
+		}
+
+		// Wait for all stocks in this batch to complete
+		batchWg.Wait()
+
+		// Add batch results to global results with mutex protection
+		mu.Lock()
+		allAssets = append(allAssets, batchAssets...)
+		totalProcessed += len(batchAssets)
+		mu.Unlock()
+
+		// Rate limiting between batches (reduced since we're using parallel processing)
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	fmt.Printf("✅ Successfully processed %d global stocks from batch endpoint\n", len(allAssets))
+
+	// Print detailed statistics
+	fmt.Printf("\n📊 BATCH PROCESSING STATISTICS:\n")
+	fmt.Printf("   🎯 Total symbols requested: %d\n", totalRequested)
+	fmt.Printf("   📥 Total symbols received from API: %d\n", totalReceived)
+	fmt.Printf("   ✅ Total symbols successfully processed: %d\n", totalProcessed)
+	fmt.Printf("   ❌ Skipped due to invalid market cap: %d\n", skippedInvalidMarketCap)
+	fmt.Printf("   ❌ Skipped due to quote API failure: %d\n", skippedQuoteFailed)
+	fmt.Printf("   📉 Missing symbols (not returned by batch API): %d\n", totalRequested-totalReceived)
+
+	return allAssets, nil
+}
+
+// Helper function to detect country from symbol
+func (c *FMPClient) detectCountryFromSymbol(symbol string) string {
+	symbolUpper := strings.ToUpper(symbol)
+
+	if strings.HasSuffix(symbolUpper, ".HK") {
+		return "HK"
+	} else if strings.HasSuffix(symbolUpper, ".PA") {
+		return "FR"
+	} else if strings.HasSuffix(symbolUpper, ".L") {
+		return "GB"
+	} else if strings.HasSuffix(symbolUpper, ".DE") {
+		return "DE"
+	} else if strings.HasSuffix(symbolUpper, ".SW") {
+		return "CH"
+	} else if strings.HasSuffix(symbolUpper, ".SR") {
+		return "SA"
+	} else if strings.HasSuffix(symbolUpper, ".T") {
+		return "JP"
+	} else if strings.HasSuffix(symbolUpper, ".AX") {
+		return "AU"
+	} else if strings.HasSuffix(symbolUpper, ".TO") {
+		return "CA"
+	} else if strings.HasSuffix(symbolUpper, ".SA") {
+		return "BR"
+	} else if strings.HasSuffix(symbolUpper, ".KS") {
+		return "KR"
+	} else if strings.HasSuffix(symbolUpper, ".TW") {
+		return "TW"
+	} else if strings.HasSuffix(symbolUpper, ".MI") {
+		return "IT"
+	} else if strings.HasSuffix(symbolUpper, ".MX") {
+		return "MX"
+	} else if strings.HasSuffix(symbolUpper, ".ME") {
+		return "RU"
+	} else if strings.HasSuffix(symbolUpper, ".JO") {
+		return "ZA"
+	} else if strings.HasSuffix(symbolUpper, ".CO") {
+		return "DK"
+	} else if strings.HasSuffix(symbolUpper, ".AS") {
+		return "NL"
+	} else {
+		return "US" // Default to US for symbols without country suffix
+	}
+}
+
 // Helper function to check if a string contains a word with proper word boundaries
 func containsWord(text, word string) bool {
 	// Convert to upper case for case-insensitive comparison
 	textUpper := strings.ToUpper(text)
 	wordUpper := strings.ToUpper(word)
-	
+
 	// Find all occurrences of the word
 	index := 0
 	for {
@@ -183,22 +685,22 @@ func containsWord(text, word string) bool {
 		if pos == -1 {
 			break
 		}
-		
+
 		// Adjust position to absolute index
 		pos += index
-		
+
 		// Check if it's a complete word (not part of another word)
 		isWordStart := pos == 0 || !isAlphaNumeric(textUpper[pos-1])
 		isWordEnd := pos+len(wordUpper) == len(textUpper) || !isAlphaNumeric(textUpper[pos+len(wordUpper)])
-		
+
 		if isWordStart && isWordEnd {
 			return true
 		}
-		
+
 		// Move to next potential match
 		index = pos + 1
 	}
-	
+
 	return false
 }
 
@@ -211,7 +713,7 @@ func isAlphaNumeric(c byte) bool {
 func shouldKeepNewListing(newStock, existingStock FMPStockScreener) bool {
 	newPriority := getListingPriority(newStock.Symbol, newStock.ExchangeShortName)
 	existingPriority := getListingPriority(existingStock.Symbol, existingStock.ExchangeShortName)
-	
+
 	// Lower number = higher priority
 	if newPriority < existingPriority {
 		return true
@@ -226,34 +728,40 @@ func shouldKeepNewListing(newStock, existingStock FMPStockScreener) bool {
 func getListingPriority(symbol, exchange string) int {
 	symbolUpper := strings.ToUpper(symbol)
 	exchangeUpper := strings.ToUpper(exchange)
-	
+
 	// Hong Kong main listings (highest priority)
 	if strings.HasSuffix(symbolUpper, ".HK") || exchangeUpper == "HKSE" {
 		return 1
 	}
-	
-	// US ADRs (second priority)
-	if (exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE") && 
-	   (strings.HasSuffix(symbolUpper, "Y") || strings.HasSuffix(symbolUpper, "H")) {
+
+	// London primary listings (highest priority for UK companies)
+	if strings.HasSuffix(symbolUpper, ".L") || exchangeUpper == "LSE" {
+		return 1
+	}
+
+	// European main listings (high priority for EU companies)
+	if strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") ||
+		strings.HasSuffix(symbolUpper, ".VI") || strings.HasSuffix(symbolUpper, ".SW") {
 		return 2
 	}
-	
-	// US main listings (third priority)
-	if exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE" {
+
+	// US main listings (high priority for US companies)
+	if (exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE") &&
+		!strings.HasSuffix(symbolUpper, "Y") && !strings.HasSuffix(symbolUpper, "H") {
 		return 3
 	}
-	
-	// US OTC (fourth priority)
-	if exchangeUpper == "OTC" || strings.HasSuffix(symbolUpper, "F") {
+
+	// US ADRs (lower priority than primary listings)
+	if (exchangeUpper == "NASDAQ" || exchangeUpper == "NYSE") &&
+		(strings.HasSuffix(symbolUpper, "Y") || strings.HasSuffix(symbolUpper, "H")) {
 		return 4
 	}
-	
-	// European listings (lower priority)
-	if strings.HasSuffix(symbolUpper, ".VI") || strings.HasSuffix(symbolUpper, ".L") || 
-	   strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") {
+
+	// US OTC (lower priority)
+	if exchangeUpper == "OTC" || strings.HasSuffix(symbolUpper, "F") {
 		return 5
 	}
-	
+
 	// Other exchanges (lowest priority)
 	return 6
 }
@@ -262,7 +770,7 @@ func getListingPriority(symbol, exchange string) int {
 func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
 	// Try to get real-time exchange rate from FMP
 	endpoint := fmt.Sprintf("/v3/fx/%sUSD", fromCurrency)
-	
+
 	body, err := c.makeRequest(endpoint)
 	if err == nil {
 		var fxData []struct {
@@ -274,359 +782,195 @@ func (c *FMPClient) getUSDExchangeRate(fromCurrency string) float64 {
 			return (fxData[0].Bid + fxData[0].Ask) / 2
 		}
 	}
-	
+
 	// Fallback to approximate rates (updated regularly)
 	fallbackRates := map[string]float64{
-		"HKD": 0.128,     // 1 HKD = ~0.128 USD
-		"EUR": 1.08,      // 1 EUR = ~1.08 USD  
-		"GBP": 1.26,      // 1 GBP = ~1.26 USD
-		"JPY": 0.0067,    // 1 JPY = ~0.0067 USD
-		"CAD": 0.74,      // 1 CAD = ~0.74 USD
-		"AUD": 0.64,      // 1 AUD = ~0.64 USD
-		"CNY": 0.14,      // 1 CNY = ~0.14 USD
-		"IDR": 0.000065,  // 1 IDR = ~0.000065 USD (about 15,400 IDR = 1 USD)
-		"INR": 0.012,     // 1 INR = ~0.012 USD (about 83 INR = 1 USD)
-		"KRW": 0.00075,   // 1 KRW = ~0.00075 USD (about 1,330 KRW = 1 USD)
-		"BRL": 0.18,      // 1 BRL = ~0.18 USD (about 5.5 BRL = 1 USD)
-		"MXN": 0.058,     // 1 MXN = ~0.058 USD (about 17 MXN = 1 USD)
-		"ZAR": 0.055,     // 1 ZAR = ~0.055 USD (about 18 ZAR = 1 USD)
-		"THB": 0.029,     // 1 THB = ~0.029 USD (about 34 THB = 1 USD)
-		"MYR": 0.22,      // 1 MYR = ~0.22 USD (about 4.5 MYR = 1 USD)
-		"PHP": 0.018,     // 1 PHP = ~0.018 USD (about 56 PHP = 1 USD)
-		"VND": 0.000040,  // 1 VND = ~0.000040 USD (about 25,000 VND = 1 USD)
-		"SGD": 0.74,      // 1 SGD = ~0.74 USD
-		"TWD": 0.031,     // 1 TWD = ~0.031 USD (about 32 TWD = 1 USD)
-		"CLP": 0.0010,    // 1 CLP = ~0.0010 USD (about 1,000 CLP = 1 USD)
-		"SAR": 0.267,     // 1 SAR = ~0.267 USD (about 3.75 SAR = 1 USD)
-		"ILS": 0.27,      // 1 ILS = ~0.27 USD (about 3.7 ILS = 1 USD)
-		"COP": 0.00025,   // 1 COP = ~0.00025 USD (about 4,000 COP = 1 USD)
-		"PEN": 0.27,      // 1 PEN = ~0.27 USD (about 3.7 PEN = 1 USD)
-		"EGP": 0.020,     // 1 EGP = ~0.020 USD (about 50 EGP = 1 USD)
-		"TRY": 0.029,     // 1 TRY = ~0.029 USD (about 34 TRY = 1 USD)
-		"RUB": 0.010,     // 1 RUB = ~0.010 USD (about 100 RUB = 1 USD)
+		"HKD": 0.128,    // 1 HKD = ~0.128 USD
+		"EUR": 1.08,     // 1 EUR = ~1.08 USD
+		"GBP": 1.26,     // 1 GBP = ~1.26 USD
+		"JPY": 0.0067,   // 1 JPY = ~0.0067 USD
+		"CAD": 0.74,     // 1 CAD = ~0.74 USD
+		"AUD": 0.64,     // 1 AUD = ~0.64 USD
+		"CNY": 0.14,     // 1 CNY = ~0.14 USD
+		"DKK": 0.145,    // 1 DKK = ~0.145 USD (about 6.9 DKK = 1 USD)
+		"IDR": 0.000065, // 1 IDR = ~0.000065 USD (about 15,400 IDR = 1 USD)
+		"INR": 0.012,    // 1 INR = ~0.012 USD (about 83 INR = 1 USD)
+		"KRW": 0.00075,  // 1 KRW = ~0.00075 USD (about 1,330 KRW = 1 USD)
+		"BRL": 0.18,     // 1 BRL = ~0.18 USD (about 5.5 BRL = 1 USD)
+		"MXN": 0.058,    // 1 MXN = ~0.058 USD (about 17 MXN = 1 USD)
+		"ZAR": 0.055,    // 1 ZAR = ~0.055 USD (about 18 ZAR = 1 USD)
+		"THB": 0.029,    // 1 THB = ~0.029 USD (about 34 THB = 1 USD)
+		"MYR": 0.22,     // 1 MYR = ~0.22 USD (about 4.5 MYR = 1 USD)
+		"PHP": 0.018,    // 1 PHP = ~0.018 USD (about 56 PHP = 1 USD)
+		"VND": 0.000040, // 1 VND = ~0.000040 USD (about 25,000 VND = 1 USD)
+		"SGD": 0.74,     // 1 SGD = ~0.74 USD
+		"TWD": 0.031,    // 1 TWD = ~0.031 USD (about 32 TWD = 1 USD)
+		"CLP": 0.0010,   // 1 CLP = ~0.0010 USD (about 1,000 CLP = 1 USD)
+		"SAR": 0.267,    // 1 SAR = ~0.267 USD (about 3.75 SAR = 1 USD)
+		"ILS": 0.27,     // 1 ILS = ~0.27 USD (about 3.7 ILS = 1 USD)
+		"COP": 0.00025,  // 1 COP = ~0.00025 USD (about 4,000 COP = 1 USD)
+		"PEN": 0.27,     // 1 PEN = ~0.27 USD (about 3.7 PEN = 1 USD)
+		"EGP": 0.020,    // 1 EGP = ~0.020 USD (about 50 EGP = 1 USD)
+		"TRY": 0.029,    // 1 TRY = ~0.029 USD (about 34 TRY = 1 USD)
+		"RUB": 0.010,    // 1 RUB = ~0.010 USD (about 100 RUB = 1 USD)
 	}
-	
+
 	if rate, exists := fallbackRates[fromCurrency]; exists {
 		return rate
 	}
-	
+
 	// If unknown currency, assume it's already in USD
 	return 1.0
 }
 
 func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
-	fmt.Println("🌍 Fetching ALL stocks from ALL countries systematically...")
-	
-	// Comprehensive country-by-country approach (Ultimate plan = 3000 requests/minute)
-	endpoints := []struct {
-		url string
-		desc string
-	}{
-		// Major Markets (High Priority)
-		{"/v3/stock-screener?marketCapMoreThan=1000000&limit=10000&order=desc&sortBy=marketcap&isActivelyTrading=true", "Global (Default)"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=US", "United States"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CN", "China"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=HK", "Hong Kong"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=JP", "Japan"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IN", "India"},
-		
-		// European Markets (Netflix, LVMH, Hermès should be here)
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=GB", "United Kingdom"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=FR", "France"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=DE", "Germany"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CH", "Switzerland"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NL", "Netherlands"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IT", "Italy"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ES", "Spain"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SE", "Sweden"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=DK", "Denmark"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NO", "Norway"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=FI", "Finland"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=BE", "Belgium"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AT", "Austria"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PL", "Poland"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IE", "Ireland"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PT", "Portugal"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=GR", "Greece"},
-		
-		// Asia-Pacific Markets
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=KR", "South Korea"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TW", "Taiwan"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SG", "Singapore"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AU", "Australia"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=NZ", "New Zealand"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TH", "Thailand"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=MY", "Malaysia"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ID", "Indonesia"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PH", "Philippines"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=VN", "Vietnam"},
-		
-		// Americas
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CA", "Canada"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=BR", "Brazil"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=MX", "Mexico"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AR", "Argentina"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CL", "Chile"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=CO", "Colombia"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=PE", "Peru"},
-		
-		// Middle East & Africa
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=IL", "Israel"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=SA", "Saudi Arabia"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=AE", "UAE"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=ZA", "South Africa"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=EG", "Egypt"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=TR", "Turkey"},
-		{"/v3/stock-screener?marketCapMoreThan=500000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true&country=RU", "Russia"},
-	}
-	
-	var allScreenerData []FMPStockScreener
-	totalRequests := len(endpoints)
-	successfulRequests := 0
-	
-	fmt.Printf("📊 Making %d API calls to fetch global stocks...\n", totalRequests)
-	
-	for i, endpoint := range endpoints {
-		fmt.Printf("📡 [%d/%d] Fetching %s stocks...\n", i+1, totalRequests, endpoint.desc)
-		
-		body, err := c.makeRequest(endpoint.url)
-		if err != nil {
-			fmt.Printf("⚠️  Warning: Failed to fetch %s stocks: %v\n", endpoint.desc, err)
-			continue
-		}
+	fmt.Println("🌍 Fetching top 500 stocks globally with USD conversion...")
 
-		var screenerData []FMPStockScreener
-		if err := json.Unmarshal(body, &screenerData); err != nil {
-			fmt.Printf("⚠️  Warning: Failed to parse %s stocks: %v\n", endpoint.desc, err)
-			continue
-		}
+	// Get all stocks globally and sort by market cap
+	endpoint := "/v3/stock-screener?marketCapMoreThan=100000000&limit=5000&order=desc&sortBy=marketcap&isActivelyTrading=true"
 
-		fmt.Printf("✅ %s: %d stocks\n", endpoint.desc, len(screenerData))
-		allScreenerData = append(allScreenerData, screenerData...)
-		successfulRequests++
-		
-		// Rate limiting: Ultimate plan = 3000 requests/minute = 50 requests/second
-		// We'll be conservative and limit to 20 requests/second to be safe
-		if i < len(endpoints)-1 { // Don't sleep after the last request
-			time.Sleep(50 * time.Millisecond) // 20 requests per second
-		}
-		
-		// Progress update every 10 requests
-		if (i+1)%10 == 0 {
-			fmt.Printf("📈 Progress: %d/%d markets completed (%d total stocks so far)\n", 
-				i+1, totalRequests, len(allScreenerData))
-		}
-	}
-	
-	fmt.Printf("🎯 API Summary: %d/%d successful requests\n", successfulRequests, totalRequests)
+	fmt.Printf("📡 Fetching global stocks from FMP...\n")
 
-	fmt.Printf("✅ Combined total: %d stocks from all regions\n", len(allScreenerData))
-
-	// If stock screener returned very few results, warn but continue
-	if len(allScreenerData) < 1000 {
-		fmt.Printf("⚠️  Warning: Only got %d stocks from screener. Expected more with global coverage.\n", len(allScreenerData))
+	body, err := c.makeRequest(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch global stocks: %w", err)
 	}
 
-	// Remove duplicates based on company name AND symbol
-	// Priority: HK main listing > US ADR > US OTC > European
-	companyNames := make(map[string]FMPStockScreener)
-	var uniqueScreenerData []FMPStockScreener
-	
-	for _, stock := range allScreenerData {
-		companyKey := strings.ToLower(stock.CompanyName)
-		
-		// Check if we've seen this company before
-		if existingStock, exists := companyNames[companyKey]; exists {
-			// Keep the better listing (HK > US ADR > US OTC > European)
-			if shouldKeepNewListing(stock, existingStock) {
-				companyNames[companyKey] = stock
-			}
-		} else {
-			companyNames[companyKey] = stock
-		}
+	var allStocks []FMPStockScreener
+	if err := json.Unmarshal(body, &allStocks); err != nil {
+		return nil, fmt.Errorf("failed to parse global stocks: %w", err)
 	}
-	
-	// Convert map back to slice
-	for _, stock := range companyNames {
-		uniqueScreenerData = append(uniqueScreenerData, stock)
-	}
-	
-	fmt.Printf("🔄 Removed duplicates: %d unique companies\n", len(uniqueScreenerData))
 
-	// Sort by market cap descending to ensure we get the largest companies first
-	sort.Slice(uniqueScreenerData, func(i, j int) bool {
-		return uniqueScreenerData[i].MarketCap > uniqueScreenerData[j].MarketCap
-	})
-	fmt.Printf("📊 Sorted by market cap (largest first)\n")
+	fmt.Printf("✅ Received %d stocks globally\n", len(allStocks))
 
-	var assets []AssetData
-	stockCount := 0
-	maxStocks := 490 // Target ~500 total assets (490 stocks + 10 crypto)
-	
-	fmt.Printf("🎯 Processing top %d stocks by market cap from %d unique companies...\n", maxStocks, len(uniqueScreenerData))
-	
-	for _, stock := range uniqueScreenerData {
-		if stockCount >= maxStocks {
-			break
-		}
-		if !stock.IsActivelyTrading {
-			continue
-		}
+	// Remove duplicates and ETFs with smarter deduplication
+	var validStocks []FMPStockScreener
+	seenSymbols := make(map[string]bool)
+	companyListings := make(map[string]FMPStockScreener) // Track best listing per company
 
+	for _, stock := range allStocks {
 		// Skip ETFs and index funds
 		if stock.IsEtf {
 			continue
 		}
-		
-		// Skip index funds, ETFs in company name (using word boundaries)
+
 		nameUpper := strings.ToUpper(stock.CompanyName)
 		if containsWord(nameUpper, "ETF") ||
-		   containsWord(nameUpper, "INDEX") ||
-		   containsWord(nameUpper, "FUND") ||
-		   containsWord(nameUpper, "SPDR") ||
-		   containsWord(nameUpper, "ISHARES") ||
-		   containsWord(nameUpper, "VANGUARD") ||
-		   containsWord(nameUpper, "INVESCO") {
+			containsWord(nameUpper, "INDEX") ||
+			containsWord(nameUpper, "FUND") ||
+			containsWord(nameUpper, "SPDR") ||
+			containsWord(nameUpper, "ISHARES") ||
+			containsWord(nameUpper, "VANGUARD") {
 			continue
 		}
 
-		assetType := "stock"
-		if strings.Contains(nameUpper, "REIT") {
-			assetType = "reit"
+		// Skip if already seen this exact symbol
+		if seenSymbols[stock.Symbol] {
+			continue
+		}
+		seenSymbols[stock.Symbol] = true
+
+		if stock.IsActivelyTrading && stock.MarketCap > 0 {
+			// Check if we already have a listing for this company
+			if existingStock, exists := companyListings[stock.CompanyName]; exists {
+				// Keep the better listing based on priority
+				if shouldKeepNewListing(stock, existingStock) {
+					companyListings[stock.CompanyName] = stock
+				}
+			} else {
+				// First time seeing this company
+				companyListings[stock.CompanyName] = stock
+			}
+		}
+	}
+
+	// Convert map to slice
+	for _, stock := range companyListings {
+		validStocks = append(validStocks, stock)
+	}
+
+	fmt.Printf("🔄 Filtered to %d valid stocks (removed ETFs and duplicates)\n", len(validStocks))
+
+	// Process stocks and convert to USD
+	var assets []AssetData
+	maxStocks := 490 // Target 490 stocks + 10 crypto = 500 total
+
+	fmt.Printf("💱 Converting market caps to USD (keeping original prices) and getting real-time data...\n")
+
+	for i, stock := range validStocks {
+		if len(assets) >= maxStocks {
+			break
 		}
 
-		// Get real-time quote data for this stock
+		// Detect currency from symbol and country
+		currencyCode := c.detectCurrency(stock.Symbol, stock.Country)
+
+		// Keep original price in local currency, only convert market cap to USD
+		currentPrice := stock.Price
+		marketCapUSD := stock.MarketCap
+
+		if currencyCode != "USD" {
+			exchangeRate := c.getUSDExchangeRate(currencyCode)
+			// Only convert market cap to USD for comparison (not price)
+			marketCapUSD = stock.MarketCap * exchangeRate
+
+			// Log major conversions for transparency
+			if marketCapUSD > 10e9 { // Log conversions for assets > $10B
+				fmt.Printf("💱 %s: %.2f %s (original) | Market Cap: $%.1fB USD\n",
+					stock.Symbol, stock.Price, currencyCode, marketCapUSD/1e9)
+			}
+		}
+
+		// Get real-time quote for current prices
 		quote, err := c.GetQuote(stock.Symbol)
 		var percentageChange float64
 		var previousClose float64
-		
+		var volume float64
+
 		if err == nil && quote != nil {
-			percentageChange = quote.ChangesPercentage
+			// Use real-time data in original currency
+			currentPrice = quote.Price
 			previousClose = quote.PreviousClose
+			percentageChange = quote.ChangesPercentage
+			volume = quote.Volume
+
+			// Only convert market cap to USD (not prices)
+			if currencyCode != "USD" {
+				exchangeRate := c.getUSDExchangeRate(currencyCode)
+				// Recalculate market cap in USD with real-time price
+				if quote.SharesOutstanding > 0 {
+					marketCapUSD = (quote.Price * exchangeRate) * quote.SharesOutstanding
+				}
+			}
 		} else {
-			// Fallback to screener data if quote fails
-			percentageChange = 0.0
-			previousClose = stock.Price
+			// Fallback to screener data
+			previousClose = currentPrice * 0.99 // Approximate
+			percentageChange = 1.0              // Approximate
+			volume = stock.Volume
 		}
-		
+
+		// Determine asset type
+		assetType := "stock"
+		nameUpper := strings.ToUpper(stock.CompanyName)
+		if containsWord(nameUpper, "REIT") {
+			assetType = "reit"
+		}
+
 		// Get company profile for image
-		var imageURL string
+		imageURL := ""
 		profile, err := c.GetCompanyProfile(stock.Symbol)
 		if err == nil && profile != nil {
 			imageURL = profile.Image
 		}
-		
-		// Convert all prices to USD for proper ranking
-		currentPrice := stock.Price
-		previousCloseUSD := previousClose
-		
-		// Determine currency and convert to USD
-		var currencyCode string
-		symbolUpper := strings.ToUpper(stock.Symbol)
-		countryUpper := strings.ToUpper(stock.Country)
-		exchangeUpper := strings.ToUpper(stock.ExchangeShortName)
-		
-		// Currency detection by symbol suffix (most reliable)
-		if strings.HasSuffix(symbolUpper, ".HK") || exchangeUpper == "HKSE" || countryUpper == "HK" {
-			currencyCode = "HKD"
-		} else if strings.HasSuffix(symbolUpper, ".L") || exchangeUpper == "LSE" {
-			currencyCode = "GBP"
-		} else if strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") || 
-		          strings.Contains(exchangeUpper, "EUR") {
-			currencyCode = "EUR"
-		} else if strings.HasSuffix(symbolUpper, ".T") || countryUpper == "JP" {
-			currencyCode = "JPY"
-		} else if strings.HasSuffix(symbolUpper, ".TO") || countryUpper == "CA" {
-			currencyCode = "CAD"
-		} else if strings.HasSuffix(symbolUpper, ".SS") || strings.HasSuffix(symbolUpper, ".SZ") || countryUpper == "CN" {
-			currencyCode = "CNY"
-		} else if strings.HasSuffix(symbolUpper, ".JK") || countryUpper == "ID" {
-			currencyCode = "IDR"
-		} else if strings.HasSuffix(symbolUpper, ".BO") || strings.HasSuffix(symbolUpper, ".NS") || countryUpper == "IN" {
-			currencyCode = "INR"
-		} else if strings.HasSuffix(symbolUpper, ".KS") || strings.HasSuffix(symbolUpper, ".KQ") || countryUpper == "KR" {
-			currencyCode = "KRW"
-		} else if strings.HasSuffix(symbolUpper, ".SA") || countryUpper == "BR" {
-			currencyCode = "BRL"
-		} else if strings.HasSuffix(symbolUpper, ".MX") || countryUpper == "MX" {
-			currencyCode = "MXN"
-		} else if strings.HasSuffix(symbolUpper, ".JO") || countryUpper == "ZA" {
-			currencyCode = "ZAR"
-		} else if strings.HasSuffix(symbolUpper, ".BK") || countryUpper == "TH" {
-			currencyCode = "THB"
-		} else if strings.HasSuffix(symbolUpper, ".KL") || countryUpper == "MY" {
-			currencyCode = "MYR"
-		} else if strings.HasSuffix(symbolUpper, ".PS") || countryUpper == "PH" {
-			currencyCode = "PHP"
-		} else if strings.HasSuffix(symbolUpper, ".VN") || countryUpper == "VN" {
-			currencyCode = "VND"
-		} else if strings.HasSuffix(symbolUpper, ".AX") || countryUpper == "AU" {
-			currencyCode = "AUD"
-		} else if strings.HasSuffix(symbolUpper, ".SI") || countryUpper == "SG" {
-			currencyCode = "SGD"
-		} else if strings.HasSuffix(symbolUpper, ".TW") || countryUpper == "TW" {
-			currencyCode = "TWD"
-		} else if strings.HasSuffix(symbolUpper, ".SN") || countryUpper == "CL" {
-			currencyCode = "CLP"  // Chilean Peso
-		} else if strings.HasSuffix(symbolUpper, ".SR") || countryUpper == "SA" {
-			currencyCode = "SAR"  // Saudi Riyal
-		} else if strings.HasSuffix(symbolUpper, ".TA") || countryUpper == "IL" {
-			currencyCode = "ILS"  // Israeli Shekel
-		} else if strings.HasSuffix(symbolUpper, ".CO") || countryUpper == "CO" {
-			currencyCode = "COP"  // Colombian Peso
-		} else if strings.HasSuffix(symbolUpper, ".LM") || countryUpper == "PE" {
-			currencyCode = "PEN"  // Peruvian Sol
-		} else if strings.HasSuffix(symbolUpper, ".EG") || countryUpper == "EG" {
-			currencyCode = "EGP"  // Egyptian Pound
-		} else if strings.HasSuffix(symbolUpper, ".IS") || countryUpper == "TR" {
-			currencyCode = "TRY"  // Turkish Lira
-		} else if strings.HasSuffix(symbolUpper, ".ME") || countryUpper == "RU" {
-			currencyCode = "RUB"  // Russian Ruble
-		} else {
-			currencyCode = "USD" // Default to USD
-		}
-		
-		// Convert to USD if not already in USD
-		marketCapUSD := stock.MarketCap
-		if currencyCode != "USD" {
-			exchangeRate := c.getUSDExchangeRate(currencyCode)
-			currentPrice = stock.Price * exchangeRate
-			previousCloseUSD = previousClose * exchangeRate
-			marketCapUSD = stock.MarketCap * exchangeRate // Convert market cap too!
-			
-			// Only show conversion for major stocks (top 10 by market cap) to avoid spam
-			if stockCount < 10 {
-				fmt.Printf("💱 %s: %.2f %s → $%.2f USD | Market Cap: %.1fT %s → $%.1fB USD\n", 
-					stock.Symbol, stock.Price, currencyCode, currentPrice,
-					stock.MarketCap/1e12, currencyCode, marketCapUSD/1e9)
-			}
-		}
-		
-		// Sanity check: Skip if market cap is unrealistically large (> $10 trillion)
-		// This prevents currency conversion errors from corrupting the ranking
-		if marketCapUSD > 10e12 {
-			fmt.Printf("⚠️  Skipping %s: Market cap too large ($%.1fT) - likely currency conversion error\n", 
-				stock.Symbol, marketCapUSD/1e12)
-			continue
-		}
-		
-		// Debug: Show currency conversion for Indonesian stocks
-		if strings.HasSuffix(strings.ToUpper(stock.Symbol), ".JK") {
-			fmt.Printf("🇮🇩 %s: %.0f IDR → $%.2fB USD (rate: %.6f)\n", 
-				stock.Symbol, stock.MarketCap, marketCapUSD/1e9, c.getUSDExchangeRate(currencyCode))
-		}
-		
-		// Small delay to avoid hitting API rate limits
-		time.Sleep(100 * time.Millisecond) // Increased delay due to more API calls
 
 		asset := AssetData{
 			Ticker:           stock.Symbol,
 			Name:             stock.CompanyName,
-			MarketCap:        marketCapUSD,     // Now converted to USD
-			CurrentPrice:     currentPrice,     // Now converted to USD
-			PreviousClose:    previousCloseUSD, // Now converted to USD
+			MarketCap:        marketCapUSD,  // USD for comparison
+			CurrentPrice:     currentPrice,  // Original currency
+			PreviousClose:    previousClose, // Original currency
 			PercentageChange: percentageChange,
-			Volume:           stock.Volume,
+			Volume:           volume,
 			PrimaryExchange:  stock.ExchangeShortName,
 			Country:          stock.Country,
 			Sector:           stock.Sector,
@@ -636,73 +980,137 @@ func (c *FMPClient) GetGlobalStocks() ([]AssetData, error) {
 		}
 
 		assets = append(assets, asset)
-		stockCount++
-		
-		// Progress reporting
-		if stockCount%50 == 0 {
-			fmt.Printf("📊 Processed %d/%d top stocks by market cap...\n", stockCount, maxStocks)
+
+		// Progress update
+		if (i+1)%50 == 0 {
+			fmt.Printf("📊 Processed %d/%d stocks...\n", i+1, len(validStocks))
 		}
+
+		// Rate limiting
+		time.Sleep(20 * time.Millisecond)
 	}
 
-	fmt.Printf("✅ Processed %d global securities\n", len(assets))
+	// Re-rank by USD market cap (most important step!)
+	fmt.Printf("🏆 Re-ranking %d assets by USD market cap...\n", len(assets))
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].MarketCap > assets[j].MarketCap
+	})
+
+	// Take top 490 after USD conversion and ranking
+	if len(assets) > maxStocks {
+		assets = assets[:maxStocks]
+	}
+
+	fmt.Printf("✅ Final result: Top %d stocks ranked by USD market cap\n", len(assets))
+
 	return assets, nil
+}
+
+// Helper function to detect currency from symbol and country
+func (c *FMPClient) detectCurrency(symbol, country string) string {
+	symbolUpper := strings.ToUpper(symbol)
+	countryUpper := strings.ToUpper(country)
+
+	// Symbol-based detection (most reliable)
+	if strings.HasSuffix(symbolUpper, ".JK") || countryUpper == "ID" {
+		return "IDR"
+	} else if strings.HasSuffix(symbolUpper, ".L") || countryUpper == "GB" {
+		return "GBP"
+	} else if strings.HasSuffix(symbolUpper, ".PA") || strings.HasSuffix(symbolUpper, ".DE") ||
+		strings.HasSuffix(symbolUpper, ".MI") || strings.HasSuffix(symbolUpper, ".AS") ||
+		countryUpper == "FR" || countryUpper == "DE" || countryUpper == "IT" || countryUpper == "ES" || countryUpper == "NL" {
+		return "EUR"
+	} else if strings.HasSuffix(symbolUpper, ".T") || countryUpper == "JP" {
+		return "JPY"
+	} else if strings.HasSuffix(symbolUpper, ".HK") || countryUpper == "HK" {
+		return "HKD"
+	} else if strings.HasSuffix(symbolUpper, ".TO") || countryUpper == "CA" {
+		return "CAD"
+	} else if strings.HasSuffix(symbolUpper, ".AX") || countryUpper == "AU" {
+		return "AUD"
+	} else if strings.HasSuffix(symbolUpper, ".SS") || strings.HasSuffix(symbolUpper, ".SZ") || countryUpper == "CN" {
+		return "CNY"
+	} else if strings.HasSuffix(symbolUpper, ".TW") || countryUpper == "TW" {
+		return "TWD"
+	} else if strings.HasSuffix(symbolUpper, ".KS") || strings.HasSuffix(symbolUpper, ".KQ") || countryUpper == "KR" {
+		return "KRW"
+	} else if strings.HasSuffix(symbolUpper, ".SA") || countryUpper == "BR" {
+		return "BRL"
+	} else if strings.HasSuffix(symbolUpper, ".MX") || countryUpper == "MX" {
+		return "MXN"
+	} else if strings.HasSuffix(symbolUpper, ".TA") || countryUpper == "IL" {
+		return "ILS"
+	} else if strings.HasSuffix(symbolUpper, ".SR") || countryUpper == "SA" {
+		return "SAR"
+	} else if strings.HasSuffix(symbolUpper, ".BA") || countryUpper == "AR" {
+		return "ARS"
+	} else if strings.HasSuffix(symbolUpper, ".CO") || countryUpper == "DK" {
+		return "DKK"
+	} else if countryUpper == "IN" {
+		return "INR"
+	} else if countryUpper == "ZA" {
+		return "ZAR"
+	}
+
+	// Default to USD
+	return "USD"
 }
 
 // Helper function to identify real physical commodities (only essential ones)
 func isRealCommodity(name, symbol string) bool {
 	nameUpper := strings.ToUpper(name)
 	symbolUpper := strings.ToUpper(symbol)
-	
+
 	// FIRST: Exclude micro contracts explicitly (to prevent duplicates)
 	excludedSymbols := map[string]bool{
-		"MGCUSD":  true,  // Micro Gold (duplicate of GCUSD)
-		"SILUSD":  true,  // Micro Silver (duplicate of SIUSD)
+		"MGCUSD": true, // Micro Gold (duplicate of GCUSD)
+		"SILUSD": true, // Micro Silver (duplicate of SIUSD)
 	}
-	
+
 	// Check exclusion FIRST before anything else
 	if excludedSymbols[symbolUpper] {
 		return false
 	}
-	
+
 	// Essential commodities we want (matching FMP names and symbols exactly)
 	essentialCommodities := map[string]bool{
 		// Metals only (name contains)
-		"GOLD":       true,
-		"SILVER":     true,
-		"PLATINUM":   true,
-		"PALLADIUM":  true,
-		"COPPER":     true,
+		"GOLD":      true,
+		"SILVER":    true,
+		"PLATINUM":  true,
+		"PALLADIUM": true,
+		"COPPER":    true,
 	}
-	
+
 	// Check if name contains any essential commodity
 	for commodity := range essentialCommodities {
 		if strings.Contains(nameUpper, commodity) {
 			return true
 		}
 	}
-	
+
 	// Essential symbols we want (exact matches from FMP) - Main contracts only
 	essentialSymbols := map[string]bool{
-		"GCUSD":   true,  // Gold Futures (main contract)
-		"SIUSD":   true,  // Silver Futures (main contract)
-		"PLUSD":   true,  // Platinum
-		"PAUSD":   true,  // Palladium
-		"HGUSD":   true,  // Copper
+		"GCUSD": true, // Gold Futures (main contract)
+		"SIUSD": true, // Silver Futures (main contract)
+		"PLUSD": true, // Platinum
+		"PAUSD": true, // Palladium
+		"HGUSD": true, // Copper
 	}
-	
+
 	// Check for exact symbol match
 	if essentialSymbols[symbolUpper] {
 		return true
 	}
-	
+
 	return false
 }
 
 func (c *FMPClient) GetCommodities() ([]AssetData, error) {
 	fmt.Println("🥇 Fetching commodities (Gold, Silver, Oil, etc.) from FMP...")
-	
+
 	endpoint := "/v3/quotes/commodity"
-	
+
 	body, err := c.makeRequest(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commodity data: %w", err)
@@ -721,13 +1129,11 @@ func (c *FMPClient) GetCommodities() ([]AssetData, error) {
 		if !isRealCommodity(commodity.Name, commodity.Symbol) {
 			continue // Skip non-essential commodities silently
 		}
-		
-
 
 		// Calculate actual market cap for commodities based on estimated total supply
 		var marketCap float64
 		symbolUpper := strings.ToUpper(commodity.Symbol)
-		
+
 		switch symbolUpper {
 		case "GCUSD": // Gold (main contract only)
 			// Estimated ~200,000 tonnes of gold mined (6.4B ounces)
@@ -781,7 +1187,9 @@ func saveToJSON(data []AssetData, filename string) error {
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	
+	// Disable HTML escaping to preserve special characters like é, ë, ã, ç
+	encoder.SetEscapeHTML(false)
+
 	if err := encoder.Encode(data); err != nil {
 		return fmt.Errorf("failed to encode JSON: %w", err)
 	}
@@ -800,7 +1208,7 @@ func printSummary(data []AssetData) {
 	})
 
 	fmt.Printf("\n=== TOP %d GLOBAL ASSETS BY MARKET CAP (FMP DATA) ===\n", len(data))
-	fmt.Printf("%-8s %-25s %-8s %-12s %-10s %-15s %-12s %-8s\n", 
+	fmt.Printf("%-8s %-25s %-8s %-12s %-10s %-15s %-12s %-8s\n",
 		"Ticker", "Name", "Country", "Price", "Change%", "Market Cap", "Type", "Exchange")
 	fmt.Println(strings.Repeat("-", 100))
 
@@ -808,41 +1216,41 @@ func printSummary(data []AssetData) {
 		if i >= 30 {
 			break
 		}
-		
+
 		name := asset.Name
 		if len(name) > 23 {
 			name = name[:23] + ".."
 		}
-		
+
 		country := asset.Country
 		if len(country) > 6 {
 			country = country[:6]
 		}
-		
+
 		marketCapStr := formatLargeNumber(asset.MarketCap)
-		
+
 		typeDisplay := asset.AssetType
 		if asset.AssetType == "commodity" {
 			typeDisplay = "🥇 " + asset.AssetType
 		}
-		
+
 		fmt.Printf("%-8s %-25s %-8s $%-11.2f %-9.2f%% %-15s %-12s %-8s\n",
-			asset.Ticker, name, country, asset.CurrentPrice, asset.PercentageChange, 
+			asset.Ticker, name, country, asset.CurrentPrice, asset.PercentageChange,
 			marketCapStr, typeDisplay, asset.PrimaryExchange)
 	}
-	
+
 	fmt.Printf("\nTotal global assets processed: %d\n", len(data))
-	
+
 	assetTypeCounts := make(map[string]int)
 	countryCounts := make(map[string]int)
-	
+
 	for _, asset := range data {
 		assetTypeCounts[asset.AssetType]++
 		if asset.Country != "" {
 			countryCounts[asset.Country]++
 		}
 	}
-	
+
 	fmt.Printf("\n📊 Asset Type Breakdown:\n")
 	for assetType, count := range assetTypeCounts {
 		if assetType == "commodity" {
@@ -868,8 +1276,6 @@ func formatLargeNumber(num float64) string {
 	return fmt.Sprintf("%.0f", num)
 }
 
-
-
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: No .env file found, using environment variables")
@@ -882,35 +1288,33 @@ func main() {
 
 	client := NewFMPClient(apiKey)
 
-	fmt.Println("🌟 GLOBAL MARKET ANALYSIS WITH FMP API")
-	fmt.Println("Fetching top 500 individual stocks by market cap globally:")
-	fmt.Println("🌍 ALL Countries (US, EU, Asia, Hong Kong, etc.)")
-	fmt.Println("🏢 ALL Exchanges (NYSE, NASDAQ, LSE, SEHK, etc.)")
-	fmt.Println("🥇 Plus Essential Commodities (Gold, Silver, etc.)")
-	fmt.Println("🔄 Smart Deduplication (HK main > US ADR > US OTC > EU)")
-	fmt.Println("💵 All prices standardized to USD for accurate ranking")
-	fmt.Println("⚠️  Excluding: ETFs, Index Funds, Mutual Funds")
+	fmt.Println("🌟 COMPREHENSIVE GLOBAL MARKET ANALYSIS WITH FMP API")
+	fmt.Println("📈 STRATEGY: Fetch 800+ global stocks → Rank by market cap → Select TOP 500")
+	fmt.Println("Fetching expanded global stock list from all major markets:")
+	fmt.Println("🇺🇸 USA: 150+ stocks (AAPL, MSFT, GOOGL, NVDA, META, TSLA, UBER, SNOW...)")
+	fmt.Println("🇭🇰 Hong Kong: 40+ stocks (700.HK Tencent, 9988.HK Alibaba, 3690.HK Meituan...)")
+	fmt.Println("🇫🇷 France: 50+ stocks (MC.PA LVMH, RMS.PA Hermes, TTE.PA TotalEnergies...)")
+	fmt.Println("🇨🇭 Switzerland: 30+ stocks (NESN.SW Nestle, NOVN.SW Novartis, ROG.SW Roche...)")
+	fmt.Println("🇸🇦 Saudi Arabia: 30+ stocks (2222.SR Saudi Aramco, 1120.SR Al Rajhi Bank...)")
+	fmt.Println("🇬🇧 UK: 60+ stocks (SHEL.L Shell, AZN AstraZeneca, BP, ULVR.L Unilever...)")
+	fmt.Println("🇯🇵 Japan: 60+ stocks (7203.T Toyota, 6861.T Keyence, 6098.T Recruit...)")
+	fmt.Println("🇨🇳 China: 30+ stocks (BABA, PDD, JD, BIDU, TCEHY, NIO, XPEV...)")
+	fmt.Println("🌍 Plus: Germany, Australia, Canada, Brazil, Korea, Taiwan, Spain, Italy...")
+	fmt.Println("🥇 Plus Essential Commodities (Gold, Silver, Oil, etc.)")
+	fmt.Println("📊 RANKING: All assets ranked by USD market cap → TOP 500 selected")
+	fmt.Println("💵 Market caps converted to USD for ranking (prices kept in original currency)")
+	fmt.Println("⚠️  Excluding: Indian stocks (as requested), ETFs, Index Funds")
 	fmt.Println()
-	
+
 	startTime := time.Now()
 	var allAssets []AssetData
-	
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		stocks, err := client.GetGlobalStocks()
-		if err != nil {
-			fmt.Printf("❌ Failed to fetch global stocks: %v\n", err)
-			return
-		}
-		mu.Lock()
-		allAssets = append(allAssets, stocks...)
-		mu.Unlock()
-	}()
-	
+
+	// Remove the old GetGlobalStocks() to avoid duplicates
+	// Using only GetMajorGlobalStocks() which is more comprehensive
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -923,47 +1327,76 @@ func main() {
 		allAssets = append(allAssets, commodities...)
 		mu.Unlock()
 	}()
-	
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		majorGlobalStocks, err := client.GetMajorGlobalStocks()
+		if err != nil {
+			fmt.Printf("❌ Failed to fetch major global stocks: %v\n", err)
+			return
+		}
+		mu.Lock()
+		allAssets = append(allAssets, majorGlobalStocks...)
+		mu.Unlock()
+	}()
+
 	wg.Wait()
-	
+
 	if len(allAssets) == 0 {
 		log.Fatal("❌ No assets fetched successfully!")
 	}
-	
-	// Separate stocks from commodities
+
+	// Separate stocks from commodities and count by country
 	var stocks []AssetData
 	var commodities []AssetData
-	
+	countryCounts := make(map[string]int)
+
 	for _, asset := range allAssets {
 		if asset.AssetType == "commodity" {
 			commodities = append(commodities, asset)
 		} else {
 			stocks = append(stocks, asset)
+			countryCounts[asset.Country]++
 		}
 	}
-	
-	fmt.Printf("\n📊 Received %d stocks and %d commodities\n", len(stocks), len(commodities))
-	
-	// Sort stocks by market cap and take top 500
+
+	fmt.Printf("\n📊 Retrieved %d stocks from %d countries and %d commodities\n", len(stocks), len(countryCounts), len(commodities))
+
+	// Sort ALL stocks by market cap (no limit yet)
 	sort.Slice(stocks, func(i, j int) bool {
 		return stocks[i].MarketCap > stocks[j].MarketCap
 	})
-	
-	if len(stocks) > 500 {
-		stocks = stocks[:500]
-		fmt.Printf("✂️  Limited to top 500 stocks by market cap\n")
-	}
-	
-	// Combine top 500 stocks with commodities
+
+	// Combine ALL stocks with commodities first
 	allAssets = append(stocks, commodities...)
-	
-	fmt.Printf("🔗 Final dataset: %d stocks + %d commodities = %d total assets\n", 
-		len(stocks), len(commodities), len(allAssets))
-	
-	// Final sort by market cap
+
+	// Sort ALL assets by market cap to get true top 500
 	sort.Slice(allAssets, func(i, j int) bool {
 		return allAssets[i].MarketCap > allAssets[j].MarketCap
 	})
+
+	// NOW limit to top 500 by market cap across all asset types
+	if len(allAssets) > 500 {
+		allAssets = allAssets[:500]
+		fmt.Printf("✂️  Selected top 500 assets by market cap from %d total assets\n", len(stocks)+len(commodities))
+	}
+
+	// Recount final asset types
+	finalStocks := 0
+	finalCommodities := 0
+	finalCountryCounts := make(map[string]int)
+	for _, asset := range allAssets {
+		if asset.AssetType == "commodity" {
+			finalCommodities++
+		} else {
+			finalStocks++
+			finalCountryCounts[asset.Country]++
+		}
+	}
+
+	fmt.Printf("🔗 Final top 500 dataset: %d stocks from %d countries + %d commodities = %d total assets\n",
+		finalStocks, len(finalCountryCounts), finalCommodities, len(allAssets))
 
 	filename := "global_assets_fmp.json"
 	if err := saveToJSON(allAssets, filename); err != nil {
@@ -973,8 +1406,9 @@ func main() {
 	}
 
 	printSummary(allAssets)
-	
+
 	duration := time.Since(startTime)
 	fmt.Printf("\n🎉 Total processing time: %v\n", duration)
 	fmt.Printf("🌟 Retrieved data from worldwide markets using FMP Ultimate API!\n")
-} 
+	fmt.Printf("🌍 Comprehensive global coverage using batch market cap endpoint!\n")
+}

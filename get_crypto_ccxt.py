@@ -11,11 +11,11 @@ from typing import List, Dict, Any
 
 
 def get_crypto_data_coingecko():
-    """Fetch specific top 10 cryptocurrency data from CoinGecko API"""
+    """Fetch specific top 10 cryptocurrency data from CoinGecko API with real-time prices"""
     
     import requests
     
-    print("📱 Fetching TOP 10 major cryptocurrencies from CoinGecko...")
+    print("📱 Fetching TOP 10 major cryptocurrencies with real-time prices from CoinGecko...")
     
     # Top 10 major cryptocurrencies by market cap and popularity
     target_cryptos = {
@@ -37,7 +37,7 @@ def get_crypto_data_coingecko():
     
     crypto_data = []
     
-    # Fetch specific cryptocurrencies using CoinGecko IDs
+    # Fetch specific cryptocurrencies using CoinGecko IDs with real-time data
     coin_ids = ','.join(target_cryptos.keys())
     url = f"https://api.coingecko.com/api/v3/coins/markets"
     params = {
@@ -47,17 +47,20 @@ def get_crypto_data_coingecko():
         'per_page': len(target_cryptos),
         'page': 1,
         'sparkline': 'false',
-        'price_change_percentage': '24h'
+        'price_change_percentage': '1h,24h',  # Get both 1h and 24h changes
+        'include_market_cap': 'true',
+        'include_24hr_vol': 'true',
+        'include_24hr_change': 'true'
     }
     
-    print(f"📊 Fetching specific crypto data from CoinGecko...")
+    print(f"📊 Fetching real-time crypto data from CoinGecko...")
     
     try:
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         cryptos = response.json()
         
-        print(f"✅ Retrieved {len(cryptos)} targeted cryptocurrencies")
+        print(f"✅ Retrieved {len(cryptos)} targeted cryptocurrencies with real-time prices")
         
         for crypto in cryptos:
             # Skip if missing essential data
@@ -68,33 +71,50 @@ def get_crypto_data_coingecko():
             if not crypto.get('circulating_supply') or crypto.get('circulating_supply') <= 0:
                 continue
                 
-            percentage_change = crypto.get('price_change_percentage_24h', 0) or 0
+            # Get real-time price and changes
             current_price = crypto.get('current_price')
             circulating_supply = crypto.get('circulating_supply')
-            previous_close = current_price * (1 - percentage_change / 100) if percentage_change else current_price
+            percentage_change_24h = crypto.get('price_change_percentage_24h', 0) or 0
             
-            # Market Cap = Current Price × Circulating Supply
-            # CoinGecko provides this pre-calculated, but let's validate it
-            calculated_market_cap = current_price * circulating_supply
+            # Calculate previous close from 24h percentage change
+            if percentage_change_24h != 0:
+                previous_close = current_price / (1 + percentage_change_24h / 100)
+            else:
+                previous_close = current_price
+            
+            # Get real-time market cap and volume
             api_market_cap = crypto.get('market_cap')
+            volume_24h = crypto.get('total_volume', 0) or 0
             
-            # Use the API market cap (it's more accurate as it handles edge cases)
-            # but validate it's reasonable
+            # Validate market cap calculation
+            calculated_market_cap = current_price * circulating_supply
             if abs(calculated_market_cap - api_market_cap) / api_market_cap > 0.1:  # More than 10% difference
-                print(f"⚠️  Market cap mismatch for {crypto['symbol']}: API={api_market_cap:.0f}, Calculated={calculated_market_cap:.0f}")
+                print(f"⚠️  Market cap mismatch for {crypto['symbol']}: API=${api_market_cap/1e9:.1f}B, Calculated=${calculated_market_cap/1e9:.1f}B")
+            
+            # Additional price metrics for better analysis
+            price_change_1h = crypto.get('price_change_percentage_1h', 0) or 0
+            ath = crypto.get('ath', 0) or 0
+            atl = crypto.get('atl', 0) or 0
+            last_updated = crypto.get('last_updated', datetime.now().isoformat())
             
             stock_data = {
                 "ticker": crypto['symbol'].upper(),
                 "name": crypto['name'],
-                "market_cap": api_market_cap,  # Real market cap: Price × Circulating Supply
-                "current_price": current_price,
-                "previous_close": previous_close,
-                "percentage_change": percentage_change,
-                "volume": crypto.get('total_volume', 0) or 0,
-                "circulating_supply": circulating_supply,  # Add this for transparency
+                "market_cap": api_market_cap,  # Real-time market cap
+                "current_price": current_price,  # Real-time price
+                "previous_close": previous_close,  # Calculated from 24h change
+                "percentage_change": percentage_change_24h,  # 24h change
+                "volume": volume_24h,  # 24h trading volume
+                "circulating_supply": circulating_supply,
                 "primary_exchange": "Cryptocurrency",
                 "asset_type": "crypto",
-                "image": crypto.get('image', ''),  # Crypto logo image URL
+                "image": crypto.get('image', ''),
+                # Additional real-time metrics
+                "price_change_1h": price_change_1h,
+                "all_time_high": ath,
+                "all_time_low": atl,
+                "last_updated": last_updated,
+                "rank": crypto.get('market_cap_rank', 0)
             }
             
             crypto_data.append(stock_data)
