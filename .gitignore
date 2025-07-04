@@ -1,20 +1,87 @@
-# Environment variables and secrets
+# Environment and sensitive files
 .env
 .env.local
 .env.production
-.env.staging
-*.env
+.env.development
+*.key
+*.pem
 
-# API Keys and credentials
-config.ini
-secrets.json
-credentials.json
+# Generated JSON data files
+*.json
+!go.mod
+!go.sum
 
-# Python artifacts
+# Python virtual environment
+venv/
+env/
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Log files
+*.log
+logs/
+log/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
 *.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated files
+.directory
+.fuse_hidden*
+.nfs*
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -28,43 +95,44 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.venv/
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Database files
-*.db
-*.sqlite3
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
 
-# Log files
-*.log
-logs/
+# API Keys and credentials
+config.ini
+secrets.json
+credentials.json
 
 # Chrome driver and browser data
 chromedriver
 geckodriver
 *.crx
+
+# Windows
+Desktop.ini
+
+# Virtual environments
+env.bak/
+venv.bak/
+.venv/
 
 # Temporary files
 temp/
@@ -72,16 +140,11 @@ tmp/
 *.tmp
 
 # OS generated files
-.DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Windows
-Desktop.ini
 
 # Coverage reports
 htmlcov/
@@ -90,7 +153,6 @@ htmlcov/
 coverage.xml
 
 # Docker
-docker-compose.override.yml
 .docker/
 
 # Logs directory

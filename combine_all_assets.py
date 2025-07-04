@@ -37,6 +37,8 @@ class AssetCombiner:
         if self.supabase_url and self.supabase_key:
             self.supabase = create_client(self.supabase_url, self.supabase_key)
             logger.info("Supabase connection configured")
+            logger.info(f"Supabase URL: {self.supabase_url[:50]}...")
+            logger.info(f"Supabase Key: ...{self.supabase_key[-10:]}")
         else:
             logger.warning("Supabase environment variables not set")
             
@@ -322,6 +324,15 @@ class AssetCombiner:
             logger.warning("No Supabase connection configured")
             return
         
+        # Debug: Test connection and check table
+        try:
+            logger.info("Testing Supabase connection...")
+            test_query = self.supabase.table('assets').select('id').limit(1).execute()
+            logger.info(f"Connection test successful. Found {len(test_query.data)} existing records")
+        except Exception as e:
+            logger.error(f"Connection test failed: {e}")
+            return
+        
         try:
             today = datetime.now().strftime('%Y-%m-%d')
             
@@ -359,8 +370,30 @@ class AssetCombiner:
                         # Use regular insert when database was cleared
                         result = self.supabase.table('assets').insert(batch).execute()
                     else:
-                        # Use upsert with the correct constraint name from the database
-                        result = self.supabase.table('assets').upsert(batch, on_conflict='symbol,snapshot_date').execute()
+                        # Try upsert first, fall back to insert if constraint doesn't exist
+                        try:
+                            logger.info(f"Attempting upsert for batch {i//batch_size + 1} with {len(batch)} assets")
+                            result = self.supabase.table('assets').upsert(batch, on_conflict='symbol,snapshot_date').execute()
+                            logger.info(f"Upsert successful for batch {i//batch_size + 1}")
+                        except Exception as upsert_error:
+                            error_code = str(upsert_error)
+                            logger.warning(f"Upsert failed: {error_code}")
+                            
+                            if '42P10' in error_code:
+                                # No unique constraint exists, use regular insert
+                                logger.info("Error 42P10: No unique constraint found, switching to insert mode")
+                                try:
+                                    result = self.supabase.table('assets').insert(batch).execute()
+                                    logger.info(f"Insert successful for batch {i//batch_size + 1}")
+                                except Exception as insert_error:
+                                    logger.error(f"Insert also failed: {insert_error}")
+                                    raise insert_error
+                            elif '23505' in error_code:
+                                logger.info("Error 23505: Duplicate key constraint violation (this should not happen with upsert)")
+                                raise upsert_error
+                            else:
+                                logger.error(f"Unknown error during upsert: {error_code}")
+                                raise upsert_error
                     
                     if result.data:
                         total_processed += len(batch)
@@ -375,7 +408,14 @@ class AssetCombiner:
                             if clear_existing:
                                 individual_result = self.supabase.table('assets').insert([individual_asset]).execute()
                             else:
-                                individual_result = self.supabase.table('assets').upsert([individual_asset], on_conflict='symbol,snapshot_date').execute()
+                                try:
+                                    individual_result = self.supabase.table('assets').upsert([individual_asset], on_conflict='symbol,snapshot_date').execute()
+                                except Exception as upsert_error:
+                                    if '42P10' in str(upsert_error):
+                                        # No unique constraint exists, use regular insert
+                                        individual_result = self.supabase.table('assets').insert([individual_asset]).execute()
+                                    else:
+                                        raise upsert_error
                             if individual_result.data:
                                 successful += 1
                         except Exception as individual_error:

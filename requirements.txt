@@ -1,0 +1,28 @@
+# Python Dependencies for Trading Analysis System
+
+# Supabase client for database operations
+supabase==2.4.0
+
+# HTTP requests for API calls
+requests==2.31.0
+
+# CoinGecko API client for crypto data
+pycoingecko==3.1.0
+
+# CCXT for crypto exchange data
+ccxt==4.2.25
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Date and time utilities
+python-dateutil==2.8.2
+
+# JSON handling (built-in, but listing for reference)
+# json - built-in module
+
+# Logging utilities (built-in)
+# logging - built-in module
+
+# Type hints support
+typing-extensions==4.9.0 
